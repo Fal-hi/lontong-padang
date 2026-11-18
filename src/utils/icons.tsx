@@ -64,4 +64,7 @@ export {
   ArrowRight as ArrowRightIcon,
   Download as DownloadIcon,
   Save as SaveIcon,
+  ArrowUpRight as ArrowUpRightIcon,
+  Volume2 as VolumeIcon,
+  VolumeX as VolumeMuteIcon,
 } from "lucide-react";

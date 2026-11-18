@@ -17,7 +17,7 @@ export default function AppAvatar({ user, size = 'md' }: AppAvatarProps) {
 
   return (
     <div
-      className={`${sizeMap[size]} rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 font-semibold flex items-center justify-center text-white shrink-0`}
+      className={`${sizeMap[size]} rounded-full bg-gradient-to-br from-primary-500 to-primary-700 font-semibold flex items-center justify-center text-white shrink-0`}
     >
       {initials}
     </div>

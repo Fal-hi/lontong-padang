@@ -13,17 +13,17 @@ interface PlatformMeta {
 const PLATFORM_META: Record<OrderSource, PlatformMeta> = {
   grab: {
     color: '#16a34a',
-    bg: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
+    bg: 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300',
     logo: '/logo/grabfood.png',
   },
   gofood: {
     color: '#dc2626',
-    bg: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+    bg: 'bg-danger-100 dark:bg-danger-900/30 text-danger-700 dark:text-danger-300',
     logo: '/logo/gofood.png',
   },
   shopeefood: {
     color: '#2563eb',
-    bg: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+    bg: 'bg-info-100 dark:bg-info-900/30 text-info-700 dark:text-info-300',
     logo: '/logo/shopeefood.png',
   },
   manual: {

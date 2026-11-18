@@ -4,16 +4,18 @@ import {
   StatCard,
   SectionTitle,
   FilterChip,
+  ChartCustomTooltip,
 } from "../../components";
 import { useOrderStore } from "../../stores/orderStore";
+import { useNavStore } from "../../stores/navStore";
 import {
   CHART_COLORS,
-  CHART_TOOLTIP_STYLE,
   ORDER_SOURCES,
 } from "../../constants";
 import {
   addDays,
   computeDaySummary,
+  formatChartYAxis,
   formatCompact,
   formatCurrency,
   toDayKey,
@@ -21,7 +23,7 @@ import {
 } from "../../utils";
 import { BarChart } from "@mantine/charts";
 import { useMediaQuery } from "@mantine/hooks";
-import { FileBarChartIcon } from "../../utils/icons";
+import { FileBarChartIcon, ChevronRightIcon } from "../../utils/icons";
 import PlatformBadge from "../../components/PlatformBadge";
 
 type Period = "today" | "week" | "month" | "all";
@@ -60,6 +62,7 @@ function periodLabel(period: Period): string {
 }
 
 export default function ReportsPage() {
+  const navigate = useNavStore((s) => s.navigate);
   const orders = useOrderStore((s) => s.orders);
   const [period, setPeriod] = useState<Period>("today");
   const isMobile = useMediaQuery("(max-width: 640px)");
@@ -121,32 +124,42 @@ export default function ReportsPage() {
       label: "Total Pesanan",
       value: summary.totalOrders,
       icon: "orders",
+      color: "blue" as const,
+      onClick: () => navigate("orders"),
     },
     {
       label: "Gross Penjualan",
       value: summary.grossSales,
       icon: "dollar",
+      color: "primary" as const,
       isPrice: true,
     },
     {
       label: "Pesanan Selesai",
       value: summary.completedCount,
       icon: "check",
+      color: "teal" as const,
+      onClick: () => navigate("orders"),
     },
     {
       label: "Dibatalkan",
       value: summary.cancelledCount,
       icon: "cancel",
+      color: "red" as const,
+      onClick: () => navigate("orders"),
     },
     {
       label: "Belum Dibayar",
       value: summary.unpaidCount,
       icon: "wallet",
+      color: "amber" as const,
+      onClick: () => navigate("orders"),
     },
     {
       label: "Rata-rata Pesanan",
       value: summary.avgOrderValue,
       icon: "trending",
+      color: "purple" as const,
       isPrice: true,
     },
   ];
@@ -179,9 +192,9 @@ export default function ReportsPage() {
 
         <div>
           <SectionTitle title="Pendapatan 7 Hari Terakhir" />
-          <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
             <BarChart
-              h={isMobile ? 190 : 260}
+              h={isMobile ? 180 : 250}
               data={weekSeries}
               dataKey="date"
               series={[
@@ -200,20 +213,39 @@ export default function ReportsPage() {
               gridAxis="x"
               withTooltip
               tooltipProps={{
-                contentStyle: CHART_TOOLTIP_STYLE,
+                content: (props) => (
+                  <ChartCustomTooltip
+                    {...props}
+                    seriesLabels={{ penjualan: "Gross", selesai: "Selesai" }}
+                    valueFormatter={(v) => formatCurrency(Number(v))}
+                  />
+                ),
+                allowEscapeViewBox: { x: false, y: false },
+                offset: 8,
+                position: undefined,
+                wrapperStyle: { zIndex: 40, pointerEvents: "none" },
               }}
               xAxisProps={{
                 tickMargin: 8,
-                tick: { fontSize: isMobile ? 10 : 12 },
+                tick: { fontSize: 10, fill: "#6b7280" },
               }}
               yAxisProps={{
-                tickFormatter: (v: number) => `${(v / 1_000_000).toFixed(0)}jt`,
-                tick: { fontSize: isMobile ? 10 : 12 },
-                width: isMobile ? 36 : 55,
+                tickFormatter: (v: number) => formatChartYAxis(Number(v)),
+                tick: { fontSize: 10, fill: "#6b7280" },
+                width: isMobile ? 42 : 52,
+              }}
+              barChartProps={{
+                margin: {
+                  top: 8,
+                  right: 8,
+                  left: isMobile ? -10 : -4,
+                  bottom: 0,
+                },
               }}
               valueFormatter={(v) => formatCompact(Number(v))}
               barProps={{
-                barSize: isMobile ? 10 : 18,
+                barSize: isMobile ? 10 : 16,
+                radius: [4, 4, 0, 0],
               }}
             />
           </div>
@@ -234,24 +266,35 @@ export default function ReportsPage() {
                   );
                   const pct = summary.byPlatform[source.value].sales / maxSales;
                   return (
-                    <div key={source.value} className="px-3.5 py-3">
+                    <div
+                      key={source.value}
+                      onClick={() => navigate("orders")}
+                      className="px-3.5 py-3 hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer transition-colors group"
+                      title={`Lihat pesanan ${source.label}`}
+                    >
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <div className="flex items-center gap-2 min-w-0">
                           <PlatformBadge
                             source={source.value}
                             showLabel={false}
                           />
-                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors">
                             {source.label} · {data.orders} pesanan
                           </span>
                         </div>
-                        <span className="font-semibold text-sm dark:text-gray-100 whitespace-nowrap">
-                          {formatCurrency(data.sales)}
-                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="font-semibold text-sm dark:text-gray-100 whitespace-nowrap">
+                            {formatCurrency(data.sales)}
+                          </span>
+                          <ChevronRightIcon
+                            size={14}
+                            className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 group-hover:translate-x-0.5 transition-all"
+                          />
+                        </div>
                       </div>
                       <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-emerald-500"
+                          className="h-full rounded-full bg-primary"
                           style={{ width: `${Math.round(pct * 100)}%` }}
                         />
                       </div>
@@ -278,19 +321,27 @@ export default function ReportsPage() {
                 {bestSelling.map((item, i) => (
                   <div
                     key={item.menuId}
-                    className="flex items-center justify-between gap-2 px-3.5 py-3"
+                    onClick={() => navigate("menu")}
+                    className="flex items-center justify-between gap-2 px-3.5 py-3 hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer transition-colors group"
+                    title="Buka menu"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-6 h-6 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex items-center justify-center shrink-0">
+                      <span className="w-6 h-6 rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-bold flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                         {i + 1}
                       </span>
-                      <span className="text-sm font-medium dark:text-gray-100 truncate">
+                      <span className="text-sm font-medium dark:text-gray-100 truncate group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors">
                         {item.name}
                       </span>
                     </div>
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 shrink-0">
-                      {item.quantity} pcs
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                        {item.quantity} pcs
+                      </span>
+                      <ChevronRightIcon
+                        size={14}
+                        className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>

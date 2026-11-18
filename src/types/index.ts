@@ -245,6 +245,8 @@ export interface NavItem {
   icon: string;
 }
 
+export type DateFilter = 'today' | 'yesterday' | 'week' | 'all';
+
 export interface OrderFilters {
   search: string;
   date: string | null; // dayKey or null

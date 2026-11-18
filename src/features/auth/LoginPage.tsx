@@ -5,6 +5,7 @@ import { useNavStore } from '../../stores/navStore';
 import Logo from '../../components/Logo';
 import { mockUser } from '../../mock';
 import { APP_VERSION, DEMO_CREDENTIALS, LOGIN_LOADING_MS } from '../../constants';
+import { notify } from '../../stores/notificationStore';
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Nama pengguna wajib diisi'),
@@ -28,7 +29,9 @@ export default function LoginPage() {
     const result = loginSchema.safeParse({ username, password });
     if (!result.success) {
       const firstError = result.error.issues[0];
-      setError(firstError?.message ?? 'Mohon isi semua kolom');
+      const errMsg = firstError?.message ?? 'Mohon isi semua kolom';
+      setError(errMsg);
+      notify.warning(errMsg, 'Data Belum Lengkap');
       return;
     }
 
@@ -36,7 +39,9 @@ export default function LoginPage() {
       result.data.username !== DEMO_CREDENTIALS.username ||
       result.data.password !== DEMO_CREDENTIALS.password
     ) {
-      setError('Nama pengguna atau kata sandi salah');
+      const errMsg = 'Nama pengguna atau kata sandi tidak cocok';
+      setError(errMsg);
+      notify.danger(errMsg, 'Gagal Masuk');
       return;
     }
 
@@ -44,12 +49,13 @@ export default function LoginPage() {
     await new Promise((resolve) => setTimeout(resolve, LOGIN_LOADING_MS));
 
     login(mockUser);
+    notify.success(`Selamat datang kembali, ${mockUser.fullName}!`, 'Berhasil Masuk');
     navigate('dashboard');
     setLoading(false);
   };
 
   return (
-    <div className="w-full min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-emerald-50 via-emerald-50/40 to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900">
+    <div className="w-full min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-primary-50 via-primary-50/40 to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900">
       <div className="w-full max-w-[400px] bg-white dark:bg-gray-800 rounded-2xl p-6 sm:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.08),0_1px_4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.3),0_1px_4px_rgba(0,0,0,0.15)]">
         <div className="flex flex-col items-center gap-6">
           <Logo size="md" />
@@ -60,7 +66,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="w-full bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 text-sm">
+            <div className="w-full bg-danger-50 dark:bg-danger-900/20 text-danger-700 dark:text-danger-400 border border-danger-200 dark:border-danger-800 rounded-lg px-4 py-3 text-sm">
               {error}
             </div>
           )}
@@ -74,7 +80,7 @@ export default function LoginPage() {
                 value={username}
                 onChange={(e) => { setUsername(e.target.value); setError(null); }}
                 autoComplete="username"
-                className="w-full py-2.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-emerald-500 transition-colors"
+                className="w-full py-2.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-primary transition-colors"
               />
             </div>
 
@@ -87,7 +93,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(null); }}
                   autoComplete="current-password"
-                  className="w-full py-2.5 px-3 pr-12 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-emerald-500 transition-colors"
+                  className="w-full py-2.5 px-3 pr-12 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-primary transition-colors"
                 />
                 <button
                   type="button"
@@ -104,7 +110,7 @@ export default function LoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="accent-emerald-600"
+                className="accent-primary"
               />
               <span>Ingat saya</span>
             </label>
@@ -112,9 +118,22 @@ export default function LoginPage() {
             <button
               disabled={loading}
               onClick={handleLogin}
-              className="w-full py-2.5 rounded-lg bg-emerald-600 text-white font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-60"
+              className="w-full py-2.5 rounded-lg bg-primary text-white font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-60"
             >
               {loading ? 'Masuk...' : 'Masuk'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setUsername(DEMO_CREDENTIALS.username);
+                setPassword(DEMO_CREDENTIALS.password);
+                setError(null);
+                notify.info('Akun demo (admin / 123456) diisi otomatis.', 'Kredensial Demo');
+              }}
+              className="w-full py-2 px-3 rounded-lg border border-primary-200 dark:border-primary-800/60 bg-primary-50/50 dark:bg-primary-950/20 text-primary-700 dark:text-primary-300 text-xs font-medium cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+            >
+              Gunakan Akun Demo (admin / 123456)
             </button>
           </div>
 

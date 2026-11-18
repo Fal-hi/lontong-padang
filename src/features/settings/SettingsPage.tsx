@@ -4,6 +4,9 @@ import { useAuthStore } from '../../stores/authStore';
 import { useNavStore } from '../../stores/navStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useStoreStore } from '../../stores/storeStore';
+import { useSoundStore } from '../../stores/soundStore';
+import { notify } from '../../stores/notificationStore';
+import { sound } from '../../utils/sound';
 import { APP_VERSION } from '../../constants';
 import {
   LogoutIcon,
@@ -15,6 +18,8 @@ import {
   BadgeCheckIcon,
   StoreIcon,
   SaveIcon,
+  VolumeIcon,
+  VolumeMuteIcon,
 } from '../../utils/icons';
 
 export default function SettingsPage() {
@@ -26,6 +31,9 @@ export default function SettingsPage() {
 
   const colorScheme = useThemeStore((s) => s.colorScheme);
   const toggleTheme = useThemeStore((s) => s.toggleColorScheme);
+
+  const soundEnabled = useSoundStore((s) => s.soundEnabled);
+  const toggleSound = useSoundStore((s) => s.toggleSound);
 
   const [notifications, setNotifications] = useState(true);
   const [language, setLanguage] = useState('id');
@@ -39,6 +47,7 @@ export default function SettingsPage() {
 
   const handleLogout = () => {
     logout();
+    notify.warning('Anda telah keluar dari aplikasi Lontong Padang.', 'Sesi Berakhir');
     navigate('dashboard');
   };
 
@@ -49,6 +58,7 @@ export default function SettingsPage() {
       phone: storePhone.trim(),
     });
     setSaved(true);
+    notify.success('Informasi profil toko berhasil diperbarui.', 'Pengaturan Disimpan');
     setTimeout(() => setSaved(false), 2000);
   };
 
@@ -74,7 +84,7 @@ export default function SettingsPage() {
                 type="text"
                 value={storeName}
                 onChange={(e) => setStoreName(e.target.value)}
-                className="w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-emerald-500 transition-colors"
+                className="w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-primary transition-colors"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -85,7 +95,7 @@ export default function SettingsPage() {
                 type="text"
                 value={storeAddress}
                 onChange={(e) => setStoreAddress(e.target.value)}
-                className="w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-emerald-500 transition-colors"
+                className="w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-primary transition-colors"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -96,7 +106,7 @@ export default function SettingsPage() {
                 type="text"
                 value={storePhone}
                 onChange={(e) => setStorePhone(e.target.value)}
-                className="w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-emerald-500 transition-colors"
+                className="w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-primary transition-colors"
               />
             </div>
             <div className="flex items-center gap-1.5 flex-wrap text-xs text-gray-500 dark:text-gray-400">
@@ -109,7 +119,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleSaveStore}
-              className="w-full py-2.5 rounded-lg bg-emerald-600 text-white font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity border-0 flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-semibold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 flex items-center justify-center gap-2 shadow-sm shadow-primary/25"
             >
               {saved ? (
                 <>
@@ -138,8 +148,8 @@ export default function SettingsPage() {
               <span
                 className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full w-fit ${
                   isOwner
-                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                    ? 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-300'
+                    : 'bg-info-100 dark:bg-info-900/30 text-info-700 dark:text-info-300'
                 }`}
               >
                 {isOwner ? (
@@ -182,8 +192,55 @@ export default function SettingsPage() {
               </div>
               <Toggle
                 checked={isDark}
-                onChange={toggleTheme}
+                onChange={() => {
+                  toggleTheme();
+                  notify.info(
+                    isDark ? 'Mode terang diaktifkan.' : 'Mode gelap diaktifkan.',
+                    'Tema Tampilan',
+                  );
+                }}
                 label="Mode Gelap"
+              />
+            </div>
+
+            <hr className="border-gray-200 dark:border-gray-700" />
+
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                {soundEnabled ? (
+                  <VolumeIcon size={18} color="#059669" className="shrink-0" />
+                ) : (
+                  <VolumeMuteIcon size={18} color="#9ca3af" className="shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="font-medium text-sm dark:text-gray-200">
+                    Suara Notifikasi
+                  </p>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {soundEnabled
+                      ? 'Lonceng pesanan & status aktif'
+                      : 'Efek suara dibisukan (hening)'}
+                  </span>
+                </div>
+              </div>
+              <Toggle
+                checked={soundEnabled}
+                onChange={() => {
+                  const next = toggleSound();
+                  if (next) {
+                    sound.preview();
+                    notify.info(
+                      'Efek suara pesanan diaktifkan.',
+                      'Suara Notifikasi',
+                    );
+                  } else {
+                    notify.info(
+                      'Efek suara pesanan dinonaktifkan (hening).',
+                      'Suara Notifikasi',
+                    );
+                  }
+                }}
+                label="Suara Notifikasi"
               />
             </div>
 
@@ -203,7 +260,13 @@ export default function SettingsPage() {
               </div>
               <select
                 value={language}
-                onChange={(e) => setLanguage(e.target.value)}
+                onChange={(e) => {
+                  setLanguage(e.target.value);
+                  notify.info(
+                    e.target.value === 'id' ? 'Bahasa Indonesia aktif' : 'English language selected',
+                    'Pengaturan Bahasa',
+                  );
+                }}
                 className="text-xs py-1.5 px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-gray-200 w-[110px] shrink-0 outline-none"
               >
                 <option value="id">Indonesia</option>
@@ -227,7 +290,16 @@ export default function SettingsPage() {
               </div>
               <Toggle
                 checked={notifications}
-                onChange={() => setNotifications((v) => !v)}
+                onChange={() => {
+                  setNotifications((v) => {
+                    const next = !v;
+                    notify.info(
+                      next ? 'Notifikasi push diaktifkan.' : 'Notifikasi push dinonaktifkan.',
+                      'Notifikasi',
+                    );
+                    return next;
+                  });
+                }}
                 label="Notifikasi"
               />
             </div>
@@ -238,7 +310,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-medium text-sm cursor-pointer border-0 flex items-center justify-center gap-2 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+            className="w-full py-2.5 rounded-xl bg-danger-50 dark:bg-danger-950/40 text-danger dark:text-danger-400 font-semibold text-sm cursor-pointer border border-danger-200 dark:border-danger-800/60 flex items-center justify-center gap-2 hover:bg-danger-100 dark:hover:bg-danger-900/40 active:scale-98 transition-all"
           >
             <LogoutIcon size={18} color="#dc2626" />
             Keluar

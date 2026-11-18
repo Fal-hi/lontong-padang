@@ -16,7 +16,7 @@ export default function Logo({ size = 'md', showText = true, className }: LogoPr
   return (
     <div className={`flex flex-col items-center gap-1 ${className ?? ''}`}>
       <div
-        className="flex items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700"
+        className="flex items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-700"
         style={{ width: s.box, height: s.box }}
       >
         <svg
@@ -35,7 +35,7 @@ export default function Logo({ size = 'md', showText = true, className }: LogoPr
         </svg>
       </div>
       {showText && (
-        <span className={`font-bold bg-gradient-to-br from-emerald-600 to-emerald-800 bg-clip-text text-transparent ${s.text}`}>
+        <span className={`font-bold bg-gradient-to-br from-primary to-primary-800 bg-clip-text text-transparent ${s.text}`}>
           Lontong Padang
         </span>
       )}

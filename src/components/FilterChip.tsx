@@ -9,21 +9,13 @@ export default function FilterChip({ active, label, onClick }: FilterChipProps) 
     <button
       type="button"
       onClick={onClick}
-      className={`py-1.5 px-3 rounded-full cursor-pointer shrink-0 transition-all whitespace-nowrap border ${
+      className={`py-1.5 px-3 rounded-full cursor-pointer shrink-0 transition-all duration-150 whitespace-nowrap border text-xs active:scale-95 ${
         active
-          ? 'bg-emerald-50 dark:bg-gray-700 border-emerald-300 dark:border-emerald-600'
-          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+          ? 'bg-primary text-white border-primary font-semibold shadow-xs shadow-primary/30'
+          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-primary-400 dark:hover:border-primary hover:bg-primary-50/20 font-medium'
       }`}
     >
-      <span
-        className={`text-xs ${
-          active
-            ? 'font-semibold text-emerald-700 dark:text-emerald-400'
-            : 'font-normal text-gray-500 dark:text-gray-400'
-        }`}
-      >
-        {label}
-      </span>
+      {label}
     </button>
   );
 }

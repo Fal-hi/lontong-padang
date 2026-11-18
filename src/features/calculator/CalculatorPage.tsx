@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { PageContainer } from '../../components';
+import { notify } from '../../stores/notificationStore';
 
 interface CalculatorState {
   display: string;
@@ -64,9 +65,9 @@ const BUTTONS: { label: string; span?: number; variant: 'num' | 'op' | 'func' }[
 ];
 
 const btnClass: Record<string, string> = {
-  num: 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700',
-  op: 'bg-emerald-600 text-white border-0',
-  func: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600',
+  num: 'bg-gray-50 dark:bg-gray-750 text-gray-900 dark:text-gray-100 border border-gray-200/90 dark:border-gray-700 hover:border-primary-400 dark:hover:border-primary shadow-xs active:bg-gray-100 dark:active:bg-gray-700',
+  op: 'bg-gradient-to-br from-primary to-teal-700 text-white border-0 shadow-sm shadow-primary/30 hover:brightness-105 active:scale-95',
+  func: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200/80 dark:border-gray-650 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-650',
 };
 
 export default function CalculatorPage() {
@@ -115,38 +116,59 @@ export default function CalculatorPage() {
     ? `${formatDisplay(state.previousOperand)} ${state.operator}`
     : '';
 
+  const handleCopy = () => {
+    try {
+      navigator.clipboard?.writeText(state.display);
+      notify.success(`Nominal ${formatDisplay(state.display)} berhasil disalin.`, 'Kalkulator');
+    } catch {
+      notify.info(`Hasil kalkulator: ${formatDisplay(state.display)}`, 'Kalkulator');
+    }
+  };
+
   return (
     <PageContainer>
       <section className="flex flex-col gap-4 max-w-[480px] mx-auto">
-        <h5 className="font-bold text-lg">Kalkulator</h5>
-
-        <div className="p-5 rounded-xl bg-emerald-800">
-          <div className="flex flex-col items-end gap-1 min-w-0">
-            {expression && (
-              <span className="text-sm text-emerald-200 font-normal leading-none">{expression}</span>
-            )}
-            <span
-              className={`font-bold text-white leading-tight text-right w-full break-all min-h-[40px] ${
-                state.display.length > 12 ? 'text-xl' : state.display.length > 8 ? 'text-2xl' : 'text-5xl'
-              }`}
-            >
-              {formatDisplay(state.display)}
-            </span>
-          </div>
+        <div className="flex items-center justify-between">
+          <h5 className="font-bold text-lg dark:text-white">Kalkulator</h5>
+          <span className="text-xs text-gray-400">Ketuk layar untuk salin</span>
         </div>
 
-        <div className="grid grid-cols-4 gap-2">
-          {BUTTONS.map((btn) => (
-            <div
-              key={btn.label}
-              className={`rounded-xl py-4 text-center cursor-pointer select-none transition-transform active:scale-95 active:opacity-85 calc-btn ${btnClass[btn.variant]} ${btn.span === 2 ? 'col-span-2' : ''}`}
-              onClick={() => handleButton(btn.label === ',' ? '.' : btn.label)}
-            >
-              <span className={`font-semibold ${btn.variant === 'op' || btn.variant === 'num' ? 'text-xl' : 'text-lg'}`}>
-                {btn.label}
+        <div className="p-4 rounded-3xl bg-white dark:bg-gray-800 border border-gray-200/90 dark:border-gray-700 shadow-sm flex flex-col gap-4">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={handleCopy}
+            title="Klik untuk menyalin hasil"
+            className="p-5 rounded-2xl bg-gradient-to-br from-primary-800 via-primary-900 to-teal-950 shadow-md shadow-primary-950/20 border border-primary-700/40 cursor-pointer active:scale-98 transition-transform"
+          >
+            <div className="flex flex-col items-end gap-1 min-w-0">
+              {expression && (
+                <span className="text-sm text-primary-300 font-normal leading-none">{expression}</span>
+              )}
+              <span
+                className={`font-bold text-white leading-tight text-right w-full break-all min-h-[40px] tracking-tight ${
+                  state.display.length > 12 ? 'text-xl' : state.display.length > 8 ? 'text-2xl' : 'text-5xl'
+                }`}
+              >
+                {formatDisplay(state.display)}
               </span>
             </div>
-          ))}
+          </div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {BUTTONS.map((btn) => (
+              <button
+                type="button"
+                key={btn.label}
+                className={`rounded-2xl py-4 text-center cursor-pointer select-none transition-all duration-100 active:scale-92 active:opacity-90 calc-btn ${btnClass[btn.variant]} ${btn.span === 2 ? 'col-span-2' : ''}`}
+                onClick={() => handleButton(btn.label === ',' ? '.' : btn.label)}
+              >
+                <span className={`font-semibold ${btn.variant === 'op' || btn.variant === 'num' ? 'text-xl' : 'text-lg'}`}>
+                  {btn.label}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
     </PageContainer>

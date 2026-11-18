@@ -12,6 +12,7 @@ import CalculatorPage from './features/calculator/CalculatorPage';
 import ReportsPage from './features/reports/ReportsPage';
 import SettingsPage from './features/settings/SettingsPage';
 import AppLayout from './layout/AppLayout';
+import ToastContainer from './components/ToastContainer';
 import { SPLASH_DURATION_MS } from './constants';
 import type { NavPage } from './types';
 
@@ -36,35 +37,37 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  let content: React.ReactNode;
+
   if (showingSplash) {
-    return <SplashScreen />;
-  }
-
-  if (!isAuthenticated) {
-    return <LoginPage />;
-  }
-
-  if (currentPage === 'orders' && isNewOrderOpen) {
-    return (
+    content = <SplashScreen />;
+  } else if (!isAuthenticated) {
+    content = <LoginPage />;
+  } else if (currentPage === 'orders' && isNewOrderOpen) {
+    content = (
       <AppLayout>
         <NewOrderPage />
       </AppLayout>
     );
-  }
-
-  if (currentPage === 'orders' && orderDetailId) {
-    return (
+  } else if (currentPage === 'orders' && orderDetailId) {
+    content = (
       <AppLayout>
         <OrderDetailPage />
       </AppLayout>
     );
+  } else {
+    const Page = pageMap[currentPage] ?? DashboardPage;
+    content = (
+      <AppLayout>
+        <Page />
+      </AppLayout>
+    );
   }
 
-  const Page = pageMap[currentPage] ?? DashboardPage;
-
   return (
-    <AppLayout>
-      <Page />
-    </AppLayout>
+    <>
+      <ToastContainer />
+      {content}
+    </>
   );
 }

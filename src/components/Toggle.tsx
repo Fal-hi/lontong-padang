@@ -13,7 +13,7 @@ export default function Toggle({ checked, onChange, disabled, label }: TogglePro
       disabled={disabled}
       aria-pressed={checked}
       className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors cursor-pointer border-0 ${
-        checked ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-gray-600'
+        checked ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
       } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
       title={label}
     >

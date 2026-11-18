@@ -50,6 +50,29 @@ export function formatCompact(amount: number): string {
   return `Rp ${amount}`;
 }
 
+/**
+ * Format ringkas nilai angka untuk label sumbu Y pada chart (tanpa prefix Rp agar hemat ruang).
+ * Contoh: 0 -> "0", 250000 -> "250rb", 1500000 -> "1,5jt", 2000000 -> "2jt"
+ */
+export function formatChartYAxis(amount: number): string {
+  if (!amount || amount === 0) return '0';
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? '-' : '';
+  if (abs >= 1_000_000_000) {
+    const val = abs / 1_000_000_000;
+    return `${sign}${val.toLocaleString('id-ID', { maximumFractionDigits: 1 })}M`;
+  }
+  if (abs >= 1_000_000) {
+    const val = abs / 1_000_000;
+    return `${sign}${val.toLocaleString('id-ID', { maximumFractionDigits: 1 })}jt`;
+  }
+  if (abs >= 1_000) {
+    const val = abs / 1_000;
+    return `${sign}${val.toLocaleString('id-ID', { maximumFractionDigits: 1 })}rb`;
+  }
+  return `${sign}${abs}`;
+}
+
 export function formatCurrentDate(): string {
   return new Intl.DateTimeFormat("id-ID", {
     weekday: "long",

@@ -11,10 +11,13 @@ interface ThemeState {
 }
 
 function applyColorScheme(scheme: ColorScheme) {
+  if (typeof document === 'undefined') return;
   if (scheme === 'dark') {
     document.documentElement.classList.add('dark');
+    document.documentElement.setAttribute('data-mantine-color-scheme', 'dark');
   } else {
     document.documentElement.classList.remove('dark');
+    document.documentElement.setAttribute('data-mantine-color-scheme', 'light');
   }
 }
 

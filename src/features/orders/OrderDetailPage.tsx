@@ -5,6 +5,7 @@ import type {
   MenuProduct,
   OrderItem,
   OrderSource,
+  OrderStatus,
   PaymentStatus,
 } from '../../types';
 import { useOrderStore } from '../../stores/orderStore';
@@ -16,6 +17,8 @@ import {
   formatDateTime,
   generateId,
 } from '../../utils';
+import { notify } from '../../stores/notificationStore';
+import { sound } from '../../utils/sound';
 import PlatformBadge from '../../components/PlatformBadge';
 import StatusBadge from '../../components/StatusBadge';
 import PaymentBadge from '../../components/PaymentBadge';
@@ -142,7 +145,7 @@ export default function OrderDetailPage() {
           </p>
           <button
             onClick={closeOrderDetail}
-            className="text-sm font-medium text-emerald-600 cursor-pointer bg-transparent border-0"
+            className="text-sm font-medium text-primary cursor-pointer bg-transparent border-0"
           >
             Kembali ke daftar pesanan
           </button>
@@ -155,6 +158,23 @@ export default function OrderDetailPage() {
   const isFinal = order.status === 'selesai' || order.status === 'dibatalkan';
   const itemCount = order.items.reduce((s, i) => s + i.quantity, 0);
 
+  const handleStatusChange = (status: OrderStatus) => {
+    setActionError('');
+    const res = changeStatus(order.id, status);
+    if (!res.ok) {
+      setActionError(res.error ?? 'Gagal mengubah status pesanan');
+      notify.error(res.error ?? 'Gagal mengubah status pesanan', 'Gagal');
+      return;
+    }
+    if (status === 'diproses') {
+      sound.notification();
+      notify.info(`Pesanan #${order.orderNumber} mulai diproses di dapur.`, 'Pesanan Diproses');
+    } else if (status === 'selesai') {
+      sound.success();
+      notify.success(`Pesanan #${order.orderNumber} telah selesai!`, 'Pesanan Selesai');
+    }
+  };
+
   const handleVoid = async () => {
     if (!reason.trim()) {
       setReasonError('Alasan pembatalan wajib diisi');
@@ -164,9 +184,11 @@ export default function OrderDetailPage() {
     const res = changeStatus(order.id, 'dibatalkan', reason);
     if (!res.ok) {
       setReasonError(res.error ?? 'Gagal membatalkan');
+      notify.error(res.error ?? 'Gagal membatalkan pesanan', 'Pembatalan Gagal');
       setSubmitting(false);
       return;
     }
+    notify.danger(`Pesanan #${order.orderNumber} telah dibatalkan.`, 'Pesanan Dibatalkan');
     setVoidOpen(false);
     setReason('');
     setReasonError('');
@@ -179,8 +201,14 @@ export default function OrderDetailPage() {
       setPaymentReasonOpen(true);
       return;
     }
+    const nextLabel = order.paymentStatus === 'dibayar' ? 'Belum Dibayar' : 'Dibayar';
     const res = togglePayment(order.id);
-    if (!res.ok) setActionError(res.error ?? 'Gagal mengubah pembayaran');
+    if (!res.ok) {
+      setActionError(res.error ?? 'Gagal mengubah pembayaran');
+      notify.error(res.error ?? 'Gagal mengubah status pembayaran', 'Gagal');
+      return;
+    }
+    notify.success(`Status pembayaran #${order.orderNumber} diubah ke ${nextLabel}.`, 'Pembayaran Diperbarui');
   };
 
   const handlePaymentReason = async () => {
@@ -189,12 +217,15 @@ export default function OrderDetailPage() {
       return;
     }
     setSubmitting(true);
+    const nextLabel = order.paymentStatus === 'dibayar' ? 'Belum Dibayar' : 'Dibayar';
     const res = togglePayment(order.id, reason);
     if (!res.ok) {
       setReasonError(res.error ?? 'Gagal mengubah pembayaran');
+      notify.error(res.error ?? 'Gagal mengubah status pembayaran', 'Gagal');
       setSubmitting(false);
       return;
     }
+    notify.success(`Status pembayaran #${order.orderNumber} diubah ke ${nextLabel}.`, 'Pembayaran Diperbarui');
     setPaymentReasonOpen(false);
     setReason('');
     setReasonError('');
@@ -267,8 +298,14 @@ export default function OrderDetailPage() {
     );
     if (!res.ok) {
       setCorrectionError(res.error ?? 'Gagal menyimpan koreksi');
+      notify.error(res.error ?? 'Gagal menyimpan koreksi pesanan', 'Koreksi Gagal');
       return;
     }
+    sound.success();
+    notify.success(
+      `Perubahan pesanan #${order.orderNumber} berhasil disimpan.`,
+      'Pesanan Dikoreksi',
+    );
     setCorrectionOpen(false);
   };
 
@@ -298,7 +335,17 @@ export default function OrderDetailPage() {
         )}
 
         {/* Header card */}
-        <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5">
+        <section
+          className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5 shadow-xs ${
+            order.status === "selesai"
+              ? "border-l-4 border-l-primary-500"
+              : order.status === "diproses"
+                ? "border-l-4 border-l-info-500"
+                : order.status === "baru"
+                  ? "border-l-4 border-l-warning-500"
+                  : "border-l-4 border-l-danger-500"
+          }`}
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-col gap-1">
               <span className="text-lg font-bold dark:text-white">
@@ -342,7 +389,7 @@ export default function OrderDetailPage() {
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Total</p>
-              <p className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
+              <p className="font-bold text-sm text-primary dark:text-primary-400">
                 {formatCurrency(order.total)}
               </p>
             </div>
@@ -399,29 +446,29 @@ export default function OrderDetailPage() {
 
         {/* Actions */}
         {actionError && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg px-4 py-2.5 text-sm">
+          <div className="bg-danger-50 dark:bg-danger-900/20 border border-danger-200 dark:border-danger-800 text-danger-700 dark:text-danger-400 rounded-lg px-4 py-2.5 text-sm">
             {actionError}
           </div>
         )}
         {!isFinal && (
           <section className="flex flex-col gap-2">
-            {order.status === 'baru' && (
+            {order.status === "baru" && (
               <button
-                onClick={() => changeStatus(order.id, 'diproses')}
-                className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity border-0"
+                onClick={() => handleStatusChange("diproses")}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-info to-info-700 text-white font-semibold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-sm shadow-info/25"
               >
                 Mulai Proses
               </button>
             )}
             <button
-              onClick={() => changeStatus(order.id, 'selesai')}
-              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity border-0"
+              onClick={() => handleStatusChange("selesai")}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-semibold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-sm shadow-primary/25"
             >
               Tandai Selesai
             </button>
             <button
               onClick={() => setVoidOpen(true)}
-              className="w-full py-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-semibold text-sm cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors border-0"
+              className="w-full py-3 rounded-xl bg-danger-50 dark:bg-danger-950/40 text-danger dark:text-danger-400 font-semibold text-sm cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900/40 border border-danger-200 dark:border-danger-800/60 active:scale-98 transition-all"
             >
               Batalkan Pesanan
             </button>
@@ -432,22 +479,23 @@ export default function OrderDetailPage() {
           <section className="flex flex-col gap-2">
             <button
               onClick={handlePaymentToggle}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 font-semibold text-sm cursor-pointer border-0"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-secondary-50 dark:bg-secondary-950/40 text-secondary-700 dark:text-secondary-300 font-semibold text-sm cursor-pointer hover:bg-secondary-100 dark:hover:bg-secondary-900/40 border border-secondary-200 dark:border-secondary-800/60 active:scale-98 transition-all"
             >
               <CreditCardIcon size={16} />
-              Tandai {order.paymentStatus === 'dibayar' ? 'Belum Dibayar' : 'Dibayar'}
+              Tandai{" "}
+              {order.paymentStatus === "dibayar" ? "Belum Dibayar" : "Dibayar"}
             </button>
             {isOwner && (
               <button
                 onClick={openCorrection}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-300 font-semibold text-sm cursor-pointer border-0"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-warning-50 dark:bg-warning-950/40 text-warning-700 dark:text-warning-300 font-semibold text-sm cursor-pointer hover:bg-warning-100 dark:hover:bg-warning-900/40 border border-warning-200 dark:border-warning-800/60 active:scale-98 transition-all"
               >
                 <RotateCcwIcon size={16} />
                 Koreksi Pesanan
               </button>
             )}
-            {order.status === 'dibatalkan' && (
-              <p className="text-xs text-center text-red-500 dark:text-red-400">
+            {order.status === "dibatalkan" && (
+              <p className="text-xs text-center text-danger dark:text-danger-400">
                 Pesanan ini dibatalkan dan bersifat final.
               </p>
             )}
@@ -550,7 +598,7 @@ export default function OrderDetailPage() {
             minRows={3}
           />
           {reasonError && (
-            <span className="text-xs text-red-600">{reasonError}</span>
+            <span className="text-xs text-danger">{reasonError}</span>
           )}
           <div className="flex gap-2">
             <button
@@ -562,7 +610,7 @@ export default function OrderDetailPage() {
             <button
               disabled={submitting}
               onClick={handleVoid}
-              className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold cursor-pointer hover:opacity-90 transition-opacity border-0 disabled:opacity-60"
+              className="flex-1 py-2.5 rounded-lg bg-danger text-white text-sm font-semibold cursor-pointer hover:opacity-90 transition-opacity border-0 disabled:opacity-60"
             >
               Konfirmasi Pembatalan
             </button>
@@ -591,7 +639,7 @@ export default function OrderDetailPage() {
             minRows={3}
           />
           {reasonError && (
-            <span className="text-xs text-red-600">{reasonError}</span>
+            <span className="text-xs text-danger">{reasonError}</span>
           )}
           <div className="flex gap-2">
             <button
@@ -603,7 +651,7 @@ export default function OrderDetailPage() {
             <button
               disabled={submitting}
               onClick={handlePaymentReason}
-              className="flex-1 py-2.5 rounded-lg bg-violet-600 text-white text-sm font-semibold cursor-pointer hover:opacity-90 transition-opacity border-0 disabled:opacity-60"
+              className="flex-1 py-2.5 rounded-lg bg-secondary text-white text-sm font-semibold cursor-pointer hover:opacity-90 transition-opacity border-0 disabled:opacity-60"
             >
               Simpan
             </button>
@@ -724,7 +772,7 @@ export default function OrderDetailPage() {
                           };
                           setCorrectionItems(next);
                         }}
-                        className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center cursor-pointer border-0"
+                        className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center cursor-pointer border-0"
                       >
                         <PlusIcon size={15} color="white" />
                       </button>
@@ -735,7 +783,7 @@ export default function OrderDetailPage() {
                             prev.filter((_, i) => i !== index),
                           )
                         }
-                        className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center cursor-pointer border-0 ml-1"
+                        className="w-8 h-8 rounded-lg bg-danger-50 dark:bg-danger-900/20 flex items-center justify-center cursor-pointer border-0 ml-1"
                       >
                         <TrashIcon size={15} color="#dc2626" />
                       </button>
@@ -766,7 +814,7 @@ export default function OrderDetailPage() {
                             }}
                             className={`px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer ${
                               checked
-                                ? 'bg-emerald-600 border-emerald-600 text-white'
+                                ? 'bg-primary border-primary text-white'
                                 : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300'
                             }`}
                           >
@@ -788,7 +836,7 @@ export default function OrderDetailPage() {
                       placeholder="Catatan item"
                       className="flex-1 py-1.5 px-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-gray-100 outline-none"
                     />
-                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                    <span className="text-xs font-bold text-primary-700 dark:text-primary-400 whitespace-nowrap">
                       {formatCurrency(subtotal)}
                     </span>
                   </div>
@@ -826,7 +874,7 @@ export default function OrderDetailPage() {
                   onClick={() => setCorrectionPayment(status)}
                   className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors cursor-pointer ${
                     correctionPayment === status
-                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      ? 'bg-primary border-primary text-white'
                       : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200'
                   }`}
                 >
@@ -840,7 +888,7 @@ export default function OrderDetailPage() {
             <span className="text-sm text-gray-600 dark:text-gray-300">
               Total koreksi
             </span>
-            <span className="font-bold text-lg text-emerald-600 dark:text-emerald-400">
+            <span className="font-bold text-lg text-primary dark:text-primary-400">
               {formatCurrency(correctionTotals.total)}
             </span>
           </div>
@@ -859,13 +907,13 @@ export default function OrderDetailPage() {
               minRows={3}
             />
             {correctionError && (
-              <span className="text-xs text-red-600">{correctionError}</span>
+              <span className="text-xs text-danger">{correctionError}</span>
             )}
           </div>
 
           <button
             onClick={saveCorrection}
-            className="w-full py-3 rounded-xl bg-orange-600 text-white font-bold text-sm cursor-pointer hover:opacity-90 transition-opacity border-0"
+            className="w-full py-3 rounded-xl bg-warning text-white font-bold text-sm cursor-pointer hover:opacity-90 transition-opacity border-0"
           >
             Simpan Koreksi
           </button>

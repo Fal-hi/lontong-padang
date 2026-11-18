@@ -38,19 +38,28 @@ export default function BottomNavbar() {
               key={item.page}
               type="button"
               aria-current={isActive ? 'page' : undefined}
-              className={`flex flex-col items-center justify-center flex-1 min-w-0 h-full py-1 px-0.5 rounded-xl transition-all cursor-pointer border-0 active:scale-95 ${
+              className={`flex flex-col items-center justify-center flex-1 min-w-0 h-full py-1 px-0.5 rounded-xl transition-all duration-150 cursor-pointer border-0 active:scale-90 ${
                 isActive
-                  ? "text-emerald-600 dark:text-emerald-400 font-semibold"
-                  : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-300"
+                  ? "text-primary-700 dark:text-primary-300 font-bold"
+                  : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
               }`}
               onClick={() => navigate(item.page as NavPage)}
             >
-              <div className={`p-1 rounded-lg transition-colors ${isActive ? "bg-emerald-50 dark:bg-emerald-950/60" : ""}`}>
+              <div
+                className={`p-1 rounded-xl transition-all duration-200 ${
+                  isActive
+                    ? "bg-primary-100 dark:bg-primary-950/80 text-primary shadow-xs shadow-primary-500/10 scale-105"
+                    : "hover:bg-gray-100 dark:hover:bg-gray-750"
+                }`}
+              >
                 <Icon size={19} color={isActive ? "#059669" : "#6b7280"} />
               </div>
-              <span className="text-[10px] leading-tight truncate mt-0.5 max-w-full text-center">
+              <span className="text-[10px] leading-tight truncate mt-0.5 max-w-full text-center flex items-center gap-0.5">
                 {item.label}
               </span>
+              {isActive && (
+                <span className="w-1 h-1 rounded-full bg-primary dark:bg-primary-400 mt-0.5" />
+              )}
             </button>
           );
         })}

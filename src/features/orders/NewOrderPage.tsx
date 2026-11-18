@@ -10,6 +10,8 @@ import { useNavStore } from "../../stores/navStore";
 import { useAuthStore } from "../../stores/authStore";
 import { useStoreStore } from "../../stores/storeStore";
 import { formatCurrency, computeOrderTotals } from "../../utils";
+import { notify } from "../../stores/notificationStore";
+import { sound } from "../../utils/sound";
 import {
   ArrowLeftIcon,
   MinusIcon,
@@ -67,6 +69,13 @@ function findProduct(
   return products.find((p) => p.id === id);
 }
 
+const sourceActiveStyles: Record<string, string> = {
+  grab: "bg-primary border-primary text-white shadow-sm shadow-primary/30",
+  gofood: "bg-danger border-danger text-white shadow-sm shadow-danger/30",
+  shopeefood: "bg-warning border-warning text-white shadow-sm shadow-warning/30",
+  manual: "bg-info border-info text-white shadow-sm shadow-info/30",
+};
+
 export default function NewOrderPage() {
   const products = useMenuStore((s) => s.products);
   const addons = useMenuStore((s) => s.addons);
@@ -104,11 +113,13 @@ export default function NewOrderPage() {
   });
 
   const handleQuickAdd = (product: MenuProduct) => {
+    sound.tap();
     const idx = form.values.items.findIndex((i) => i.menuId === product.id);
     if (idx >= 0) {
       const next = [...form.values.items];
       next[idx] = { ...next[idx], quantity: next[idx].quantity + 1 };
       form.setFieldValue("items", next);
+      notify.info(`Jumlah "${product.name}" ditambah menjadi ${next[idx].quantity}.`, "Item Ditambahkan");
     } else {
       form.insertListItem("items", {
         menuId: product.id,
@@ -116,6 +127,7 @@ export default function NewOrderPage() {
         addonIds: [],
         note: "",
       });
+      notify.success(`"${product.name}" dimasukkan ke daftar pesanan.`, "Menu Dipilih");
     }
   };
 
@@ -157,6 +169,7 @@ export default function NewOrderPage() {
   const handleSubmit = () => {
     if (form.values.items.length === 0) {
       form.setFieldError("items", "Tambahkan minimal 1 item");
+      notify.warning("Pilih setidaknya 1 item menu sebelum menyimpan pesanan.", "Keranjang Kosong");
       return;
     }
 
@@ -198,6 +211,13 @@ export default function NewOrderPage() {
       orderNumber: "",
     });
 
+    sound.order();
+
+    notify.success(
+      `Pesanan #${order.orderNumber} berhasil dicatat dan disimpan!`,
+      "Pesanan Berhasil Disimpan",
+    );
+
     openOrderDetail(order.id);
   };
 
@@ -220,7 +240,7 @@ export default function NewOrderPage() {
 
       <div className="flex flex-col gap-3.5 px-4 pt-4">
         {hasErrors && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg px-4 py-2.5 text-sm">
+          <div className="bg-danger-50 dark:bg-danger-900/20 border border-danger-200 dark:border-danger-800 text-danger-700 dark:text-danger-400 rounded-lg px-4 py-2.5 text-sm">
             Mohon lengkapi data pesanan sebelum menyimpan.
           </div>
         )}
@@ -233,15 +253,18 @@ export default function NewOrderPage() {
           <div className="grid grid-cols-2 gap-2">
             {ORDER_SOURCES.map((source) => {
               const active = form.values.source === source.value;
+              const activeStyle =
+                sourceActiveStyles[source.value] ??
+                "bg-primary border-primary text-white";
               return (
                 <button
                   key={source.value}
                   type="button"
                   onClick={() => form.setFieldValue("source", source.value)}
-                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-colors cursor-pointer min-w-0 ${
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all duration-150 cursor-pointer min-w-0 active:scale-95 ${
                     active
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200"
+                      ? activeStyle
+                      : "bg-white dark:bg-gray-750 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-gray-400"
                   }`}
                 >
                   <PlatformBadge
@@ -270,7 +293,7 @@ export default function NewOrderPage() {
                     : "No. pesanan dari platform"
                 }
                 {...form.getInputProps("externalOrderNumber")}
-                className="w-full py-2.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-emerald-500 transition-colors"
+                className="w-full py-2.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-primary transition-colors"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -281,7 +304,7 @@ export default function NewOrderPage() {
                 type="text"
                 placeholder="Nama pelanggan"
                 {...form.getInputProps("customerName")}
-                className="w-full py-2.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-emerald-500 transition-colors"
+                className="w-full py-2.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-primary transition-colors"
               />
             </div>
           </div>
@@ -294,10 +317,10 @@ export default function NewOrderPage() {
               <input
                 type="datetime-local"
                 {...form.getInputProps("orderDate")}
-                className="w-full py-2.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-emerald-500 transition-colors"
+                className="w-full py-2.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-primary transition-colors"
               />
               {form.errors.orderDate && (
-                <span className="text-xs text-red-600 dark:text-red-400">
+                <span className="text-xs text-danger dark:text-danger-400">
                   {form.errors.orderDate}
                 </span>
               )}
@@ -307,20 +330,25 @@ export default function NewOrderPage() {
                 Pembayaran
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {(["dibayar", "belum_dibayar"] as const).map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => form.setFieldValue("paymentStatus", status)}
-                    className={`py-2.5 rounded-lg text-sm font-semibold border transition-colors cursor-pointer ${
-                      form.values.paymentStatus === status
-                        ? "bg-emerald-600 border-emerald-600 text-white"
-                        : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200"
-                    }`}
-                  >
-                    {status === "dibayar" ? "Dibayar" : "Belum Dibayar"}
-                  </button>
-                ))}
+                {(["dibayar", "belum_dibayar"] as const).map((status) => {
+                  const active = form.values.paymentStatus === status;
+                  return (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => form.setFieldValue("paymentStatus", status)}
+                      className={`py-2.5 rounded-xl text-sm font-semibold border transition-all duration-150 cursor-pointer active:scale-95 ${
+                        active
+                          ? status === "dibayar"
+                            ? "bg-primary border-primary text-white shadow-xs shadow-primary/30"
+                            : "bg-warning border-warning text-white shadow-xs shadow-warning/30"
+                          : "bg-white dark:bg-gray-700/60 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-gray-400"
+                      }`}
+                    >
+                      {status === "dibayar" ? "Dibayar" : "Belum Dibayar"}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -345,7 +373,7 @@ export default function NewOrderPage() {
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer border ${
                   selectedCategory === cat
-                    ? "bg-emerald-600 border-emerald-600 text-white"
+                    ? "bg-primary border-primary text-white"
                     : "bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300"
                 }`}
               >
@@ -356,16 +384,18 @@ export default function NewOrderPage() {
 
           <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-0.5">
             {displayedProducts.map((product) => {
-              const currentQty = form.values.items.find(i => i.menuId === product.id)?.quantity ?? 0;
+              const currentQty =
+                form.values.items.find((i) => i.menuId === product.id)
+                  ?.quantity ?? 0;
               return (
                 <button
                   key={product.id}
                   type="button"
                   onClick={() => handleQuickAdd(product)}
-                  className={`flex flex-col justify-between p-2.5 rounded-xl border transition-all cursor-pointer text-left active:scale-97 ${
+                  className={`flex flex-col justify-between p-2.5 rounded-xl border transition-all duration-150 cursor-pointer text-left active:scale-95 ${
                     currentQty > 0
-                      ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40"
-                      : "border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-700/60 hover:border-emerald-400"
+                      ? "border-primary-500 bg-primary-50/70 dark:bg-primary-950/40 shadow-xs border-l-4"
+                      : "border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-700/60 hover:border-primary-400 hover:shadow-xs"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-1 w-full">
@@ -373,23 +403,25 @@ export default function NewOrderPage() {
                       {product.name}
                     </span>
                     {currentQty > 0 && (
-                      <span className="shrink-0 w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">
+                      <span className="shrink-0 w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
                         {currentQty}
                       </span>
                     )}
                   </div>
                   <div className="flex items-center justify-between w-full mt-2 pt-1 border-t border-gray-200/50 dark:border-gray-600/50">
-                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                    <span className="text-xs font-bold text-primary-700 dark:text-primary-400">
                       {formatCurrency(product.price)}
                     </span>
-                    <PlusIcon size={14} color="#059669" className="shrink-0" />
+                    <div className="w-5 h-5 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center">
+                      <PlusIcon size={13} color="#059669" className="shrink-0" />
+                    </div>
                   </div>
                 </button>
               );
             })}
           </div>
           {form.errors.items && (
-            <span className="text-xs text-red-600 dark:text-red-400 mt-2 block">
+            <span className="text-xs text-danger dark:text-danger-400 mt-2 block">
               {form.errors.items}
             </span>
           )}
@@ -428,7 +460,7 @@ export default function NewOrderPage() {
                       <button
                         type="button"
                         onClick={() => updateQuantity(index, -1)}
-                        className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center cursor-pointer border-0"
+                        className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center cursor-pointer border-0 active:scale-90 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
                       >
                         <MinusIcon size={16} color="#4b5563" />
                       </button>
@@ -438,14 +470,18 @@ export default function NewOrderPage() {
                       <button
                         type="button"
                         onClick={() => updateQuantity(index, 1)}
-                        className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center cursor-pointer border-0"
+                        className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center cursor-pointer border-0 active:scale-90 hover:bg-primary-700 transition-all text-white shadow-xs"
                       >
                         <PlusIcon size={16} color="white" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => form.removeListItem("items", index)}
-                        className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center cursor-pointer border-0 ml-1"
+                        onClick={() => {
+                          const itemName = product.name;
+                          form.removeListItem("items", index);
+                          notify.info(`"${itemName}" dihapus dari pesanan.`, "Item Dihapus");
+                        }}
+                        className="w-9 h-9 rounded-lg bg-danger-50 dark:bg-danger-900/20 hover:bg-danger-100 dark:hover:bg-danger-900/40 flex items-center justify-center cursor-pointer border-0 ml-1 active:scale-90 transition-all"
                       >
                         <TrashIcon size={16} color="#dc2626" />
                       </button>
@@ -461,10 +497,10 @@ export default function NewOrderPage() {
                             key={addon.id}
                             type="button"
                             onClick={() => toggleAddon(index, addon.id)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 cursor-pointer active:scale-95 ${
                               checked
-                                ? "bg-emerald-600 border-emerald-600 text-white"
-                                : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300"
+                                ? "bg-primary border-primary text-white shadow-xs shadow-primary/30"
+                                : "bg-white dark:bg-gray-750 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-primary-400"
                             }`}
                           >
                             +{addon.name} ({formatCurrency(addon.price)})
@@ -479,9 +515,9 @@ export default function NewOrderPage() {
                       type="text"
                       placeholder="Catatan item (opsional)"
                       {...form.getInputProps(`items.${index}.note`)}
-                      className="flex-1 py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-emerald-500 transition-colors"
+                      className="flex-1 py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-primary transition-colors"
                     />
-                    <span className="font-bold text-sm text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                    <span className="font-bold text-sm text-primary-700 dark:text-primary-400 whitespace-nowrap">
                       {formatCurrency(subtotal)}
                     </span>
                   </div>
@@ -499,7 +535,7 @@ export default function NewOrderPage() {
             rows={2}
             placeholder="Catatan untuk dapur / kurir"
             {...form.getInputProps("notes")}
-            className="mt-1.5 w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-emerald-500 transition-colors resize-none"
+            className="mt-1.5 w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-primary transition-colors resize-none"
           />
         </section>
       </div>
@@ -512,14 +548,14 @@ export default function NewOrderPage() {
               Total ({form.values.items.reduce((s, i) => s + i.quantity, 0)}{" "}
               item)
             </span>
-            <span className="font-bold text-lg text-emerald-600 dark:text-emerald-400 leading-tight">
+            <span className="font-bold text-lg text-primary dark:text-primary-400 leading-tight">
               {formatCurrency(totals.total)}
             </span>
           </div>
           <button
             type="button"
             onClick={handleSubmit}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 text-white font-bold text-base cursor-pointer hover:opacity-90 active:scale-98 transition-all border-0 shadow-md"
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-bold text-base cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-md shadow-primary/25"
           >
             <ShoppingCartIcon size={18} />
             Simpan Pesanan

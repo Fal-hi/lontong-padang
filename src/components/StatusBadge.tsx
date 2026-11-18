@@ -2,12 +2,18 @@ import type { OrderStatus } from '../types';
 import { getOrderStatusLabel, getOrderStatusColor } from '../utils';
 
 const colorMap: Record<string, string> = {
+  warning:
+    'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-300',
   yellow:
-    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-300',
+  info: 'bg-info-100 text-info-700 dark:bg-info-900/30 dark:text-info-300',
+  blue: 'bg-info-100 text-info-700 dark:bg-info-900/30 dark:text-info-300',
+  primary:
+    'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300',
   green:
-    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  red: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300',
+  danger: 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-300',
+  red: 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-300',
   gray: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
 };
 

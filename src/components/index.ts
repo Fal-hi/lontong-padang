@@ -13,3 +13,4 @@ export { default as PlatformBadge } from './PlatformBadge';
 export { default as PaymentBadge } from './PaymentBadge';
 export { default as Toggle } from './Toggle';
 export { default as FilterChip } from './FilterChip';
+export { default as ChartCustomTooltip } from './ChartCustomTooltip';

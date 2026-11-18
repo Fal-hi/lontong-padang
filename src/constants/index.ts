@@ -37,10 +37,10 @@ export const ORDER_STATUS_CONFIG: Record<
   OrderStatus,
   { color: string; label: string }
 > = {
-  baru: { color: "yellow", label: "Baru" },
-  diproses: { color: "blue", label: "Diproses" },
-  selesai: { color: "green", label: "Selesai" },
-  dibatalkan: { color: "red", label: "Dibatalkan" },
+  baru: { color: "warning", label: "Baru" },
+  diproses: { color: "info", label: "Diproses" },
+  selesai: { color: "primary", label: "Selesai" },
+  dibatalkan: { color: "danger", label: "Dibatalkan" },
 };
 
 export const ORDER_STATUS_OPTIONS: Array<{
@@ -58,8 +58,8 @@ export const PAYMENT_STATUS_CONFIG: Record<
   PaymentStatus,
   { color: string; label: string }
 > = {
-  dibayar: { color: "green", label: "Dibayar" },
-  belum_dibayar: { color: "orange", label: "Belum Dibayar" },
+  dibayar: { color: "primary", label: "Dibayar" },
+  belum_dibayar: { color: "warning", label: "Belum Dibayar" },
 };
 
 export const PAYMENT_STATUS_OPTIONS: Array<{
@@ -92,14 +92,14 @@ export const SPLASH_DURATION_MS = 2000;
 export const LOGIN_LOADING_MS = 800;
 
 // Centralized semantic chart palette (Mantine color tokens).
-// revenue/sales = green, orders/counts = blue, completed = teal (green family),
-// pending = amber, cancelled = red. Kept restrained to match the emerald brand.
+// revenue/sales = primary green, orders/counts = blue, completed = teal,
+// pending = amber, cancelled = red.
 export const CHART_COLORS = {
-  revenue: "emerald.6",
-  orders: "blue.6",
-  completed: "teal.6",
-  pending: "yellow.6",
-  cancelled: "red.6",
+  revenue: "primary.6",
+  orders: "info.6",
+  completed: "primary.6",
+  pending: "warning.6",
+  cancelled: "danger.6",
 } as const;
 
 // Shared tooltip styling for all charts (works across light/dark chrome).

@@ -12,6 +12,7 @@ import { useStoreStore } from '../../stores/storeStore';
 import { MENU_CATEGORIES } from '../../constants';
 import type { MenuProduct } from '../../types';
 import { formatCurrency } from '../../utils';
+import { notify } from '../../stores/notificationStore';
 import { PlusIcon } from '../../utils/icons';
 
 export default function MenuPage() {
@@ -44,10 +45,12 @@ export default function MenuPage() {
     const price = Number(addPrice.replace(/[^0-9]/g, ''));
     if (!addName.trim()) {
       setAddError('Nama menu wajib diisi');
+      notify.warning('Nama menu wajib diisi', 'Data Tidak Lengkap');
       return;
     }
     if (!price || price <= 0) {
       setAddError('Harga harus lebih dari 0');
+      notify.warning('Harga harus lebih dari 0', 'Data Tidak Lengkap');
       return;
     }
     addProduct({
@@ -57,6 +60,7 @@ export default function MenuPage() {
       price,
       addonIds: addAddonIds,
     });
+    notify.success(`Menu "${addName.trim()}" berhasil ditambahkan ke daftar!`, 'Menu Baru');
     setAddOpen(false);
     setAddName('');
     setAddPrice('');
@@ -97,68 +101,101 @@ export default function MenuPage() {
         </span>
 
         <div className="flex flex-col gap-2.5">
-          {filtered.map((record) => (
-            <div
-              key={record.id}
-              className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between gap-3 shadow-xs"
-              style={{ opacity: record.active ? 1 : 0.6 }}
-            >
-              <div className="flex flex-col gap-1 min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-semibold text-sm dark:text-gray-100">
-                    {record.name}
-                  </span>
-                  {!record.active && (
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300">
-                      Nonaktif
+          {filtered.map((record) => {
+            const borderStyle = !record.active
+              ? "border-l-4 border-l-gray-400 opacity-60 bg-gray-50/50 dark:bg-gray-800/50"
+              : !record.available
+                ? "border-l-4 border-l-danger-500 bg-danger-50/20 dark:bg-danger-950/20"
+                : "border-l-4 border-l-primary-500 hover:shadow-md hover:border-primary-300 transition-all duration-200";
+
+            return (
+              <div
+                key={record.id}
+                className={`p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between gap-3 shadow-xs ${borderStyle}`}
+              >
+                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-sm dark:text-gray-100">
+                      {record.name}
+                    </span>
+                    {!record.active && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300">
+                        Nonaktif
+                      </span>
+                    )}
+                    {!record.available && record.active && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-danger-100 dark:bg-danger-900/30 text-danger-700 dark:text-danger-400">
+                        Habis
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-primary-700 dark:text-primary-400">
+                      {formatCurrency(record.price)}
+                    </span>
+                    <span className="text-[11px] text-gray-400">·</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {record.category}
+                    </span>
+                  </div>
+                  {record.addonIds.length > 0 && (
+                    <span className="text-[11px] text-gray-400 truncate">
+                      Tambahan: {addonNames(record)}
                     </span>
                   )}
-                  {!record.available && record.active && (
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
-                      Habis
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-col items-center gap-1 p-1.5 rounded-xl bg-gray-50 dark:bg-gray-700/60 border border-gray-100 dark:border-gray-700">
+                    <Toggle
+                      checked={record.available}
+                      disabled={!record.active}
+                      onChange={() => {
+                        const nextState = !record.available;
+                        toggleAvailable(record.id);
+                        notify.info(
+                          `"${record.name}" ditandai ${nextState ? "Tersedia" : "Habis"}.`,
+                          "Ketersediaan Menu",
+                        );
+                      }}
+                      label="Tersedia"
+                    />
+                    <span
+                      className={`text-[9px] font-semibold leading-none ${
+                        record.available && record.active
+                          ? "text-primary dark:text-primary-400"
+                          : "text-gray-400"
+                      }`}
+                    >
+                      {record.available ? "Tersedia" : "Habis"}
                     </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                    {formatCurrency(record.price)}
-                  </span>
-                  <span className="text-[11px] text-gray-400">·</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {record.category}
-                  </span>
-                </div>
-                {record.addonIds.length > 0 && (
-                  <span className="text-[11px] text-gray-400 truncate">
-                    Tambahan: {addonNames(record)}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="flex flex-col items-center gap-0.5">
-                  <Toggle
-                    checked={record.available}
-                    disabled={!record.active}
-                    onChange={() => toggleAvailable(record.id)}
-                    label="Tersedia"
-                  />
-                  <span className="text-[10px] text-gray-400 leading-none">
-                    Tersedia
-                  </span>
-                </div>
-                <div className="flex flex-col items-center gap-0.5">
-                  <Toggle
-                    checked={record.active}
-                    onChange={() => toggleActive(record.id)}
-                    label="Aktif"
-                  />
-                  <span className="text-[10px] text-gray-400 leading-none">
-                    Aktif
-                  </span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1 p-1.5 rounded-xl bg-gray-50 dark:bg-gray-700/60 border border-gray-100 dark:border-gray-700">
+                    <Toggle
+                      checked={record.active}
+                      onChange={() => {
+                        const nextState = !record.active;
+                        toggleActive(record.id);
+                        notify.info(
+                          `"${record.name}" ${nextState ? "diaktifkan" : "dinonaktifkan"}.`,
+                          "Status Menu",
+                        );
+                      }}
+                      label="Aktif"
+                    />
+                    <span
+                      className={`text-[9px] font-semibold leading-none ${
+                        record.active
+                          ? "text-primary dark:text-primary-400"
+                          : "text-gray-400"
+                      }`}
+                    >
+                      {record.active ? "Aktif" : "Off"}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {filtered.length === 0 && (
@@ -184,7 +221,7 @@ export default function MenuPage() {
             setAddError('');
             setAddOpen(true);
           }}
-          className="pointer-events-auto w-12 h-12 rounded-full bg-emerald-600 shadow-lg flex items-center justify-center cursor-pointer border-0 active:scale-95 text-white"
+          className="pointer-events-auto w-12 h-12 rounded-full bg-gradient-to-r from-primary to-teal-600 shadow-lg shadow-primary/30 flex items-center justify-center cursor-pointer border-0 active:scale-90 hover:brightness-105 transition-all text-white"
           aria-label="Tambah menu"
         >
           <PlusIcon size={22} color="white" />
@@ -260,7 +297,7 @@ export default function MenuPage() {
                     }
                     className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
                       checked
-                        ? 'bg-emerald-600 border-emerald-600 text-white'
+                        ? 'bg-primary border-primary text-white'
                         : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300'
                     }`}
                   >
@@ -271,14 +308,14 @@ export default function MenuPage() {
             </div>
           </div>
           {addError && (
-            <span className="text-xs text-red-600 dark:text-red-400">
+            <span className="text-xs text-danger dark:text-danger-400">
               {addError}
             </span>
           )}
           <button
             type="button"
             onClick={handleAdd}
-            className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm cursor-pointer hover:opacity-90 transition-opacity border-0 mt-1 active:scale-98"
+            className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm cursor-pointer hover:opacity-90 transition-opacity border-0 mt-1 active:scale-98"
           >
             Simpan Menu
           </button>

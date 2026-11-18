@@ -10,18 +10,28 @@ interface OrderCardProps {
   onClick?: () => void;
 }
 
+const statusBorderMap: Record<string, string> = {
+  selesai: "border-l-primary-500",
+  diproses: "border-l-info-500",
+  baru: "border-l-warning-500",
+  dibatalkan: "border-l-danger-500",
+};
+
 export default function OrderCard({ order, onClick }: OrderCardProps) {
   const itemCount = order.items.reduce((s, i) => s + i.quantity, 0);
+  const borderLeft = statusBorderMap[order.status] ?? "border-l-primary-500";
 
   return (
     <div
-      className={`p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-shadow order-card active:scale-[0.99] ${onClick ? "cursor-pointer" : ""}`}
+      className={`group p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-all duration-200 order-card hover:shadow-md active:scale-[0.99] border-l-4 ${borderLeft} ${
+        onClick ? "cursor-pointer" : ""
+      }`}
       onClick={onClick}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0 gap-1 flex flex-col">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-sm truncate">
+            <span className="font-semibold text-sm truncate group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors">
               {order.orderNumber}
             </span>
             <div className="flex items-center gap-2">
@@ -45,12 +55,15 @@ export default function OrderCard({ order, onClick }: OrderCardProps) {
                 <b>{itemCount} item</b>
               </span>
             </div>
-            <span className="font-bold text-sm text-emerald-700 dark:text-emerald-400">
+            <span className="font-bold text-sm text-primary-700 dark:text-primary-400">
               {formatCurrency(order.total)}
             </span>
           </div>
         </div>
-        <ChevronRightIcon size={16} color="#9ca3af" />
+        <ChevronRightIcon
+          size={16}
+          className="text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 group-hover:translate-x-0.5 transition-all ml-2 shrink-0"
+        />
       </div>
     </div>
   );
