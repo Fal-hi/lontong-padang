@@ -4,7 +4,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useNavStore } from '../../stores/navStore';
 import Logo from '../../components/Logo';
 import { mockUser } from '../../mock';
-import { APP_VERSION, DEMO_CREDENTIALS, LOGIN_LOADING_MS } from '../../constants';
+import { APP_VERSION, DEMO_CREDENTIALS, LOGIN_LOADING_MS, STORAGE_KEYS } from '../../constants';
 import { notify } from '../../stores/notificationStore';
 import { authService } from '../../services/supabaseService';
 import { isSupabaseConfigured } from '../../lib/supabase';
@@ -20,9 +20,21 @@ const loginSchema = z.object({
 });
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.REMEMBERED_EMAIL) ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem(STORAGE_KEYS.REMEMBERED_EMAIL));
+    } catch {
+      return false;
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -32,6 +44,17 @@ export default function LoginPage() {
 
   const isMockMode = import.meta.env.DEV === true && import.meta.env.VITE_USE_MOCK === 'true';
   const demoCredentials = isMockMode ? DEMO_CREDENTIALS : null;
+
+  const handleRememberMeChange = (checked: boolean) => {
+    setRememberMe(checked);
+    if (!checked) {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.REMEMBERED_EMAIL);
+      } catch {
+        // Abaikan error localStorage
+      }
+    }
+  };
 
   const handleLogin = async () => {
     setError(null);
@@ -52,6 +75,18 @@ export default function LoginPage() {
 
     const isMockMode = import.meta.env.DEV === true && import.meta.env.VITE_USE_MOCK === 'true';
 
+    const persistRememberedEmail = (targetEmail: string) => {
+      try {
+        if (rememberMe) {
+          localStorage.setItem(STORAGE_KEYS.REMEMBERED_EMAIL, targetEmail);
+        } else {
+          localStorage.removeItem(STORAGE_KEYS.REMEMBERED_EMAIL);
+        }
+      } catch {
+        // Abaikan error localStorage
+      }
+    };
+
     // 1. Try Supabase Auth if configured
     if (isSupabaseConfigured) {
       const { user, error: authError } = await authService.signIn(
@@ -60,6 +95,7 @@ export default function LoginPage() {
       );
 
       if (user) {
+        persistRememberedEmail(cleanEmail);
         login(user);
         notify.success(`Selamat datang kembali, ${user.fullName}!`, 'Berhasil Masuk');
         navigate('dashboard');
@@ -90,6 +126,7 @@ export default function LoginPage() {
       cleanPassword === DEMO_CREDENTIALS.password
     ) {
       await new Promise((resolve) => setTimeout(resolve, LOGIN_LOADING_MS));
+      persistRememberedEmail(cleanEmail);
       login(mockUser);
       notify.success(`Selamat datang kembali, ${mockUser.fullName}! (Mode Demo)`, 'Berhasil Masuk');
       navigate('dashboard');
@@ -154,12 +191,12 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <label className="flex items-center gap-2 text-sm cursor-pointer text-gray-700 dark:text-gray-300">
+            <label className="flex items-center gap-2 text-sm cursor-pointer text-gray-700 dark:text-gray-300 select-none">
               <input
                 type="checkbox"
                 checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="accent-primary"
+                onChange={(e) => handleRememberMeChange(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer"
               />
               <span>Ingat saya</span>
             </label>

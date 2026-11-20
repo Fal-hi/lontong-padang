@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Modal, Textarea } from '@mantine/core';
+import { useMemo, useState } from "react";
+import { Modal, Textarea } from "@mantine/core";
 import type {
   AuditLog,
   MenuProduct,
@@ -7,21 +7,17 @@ import type {
   OrderSource,
   OrderStatus,
   PaymentStatus,
-} from '../../types';
-import { useOrderStore } from '../../stores/orderStore';
-import { useNavStore } from '../../stores/navStore';
-import { useMenuStore } from '../../stores/menuStore';
-import { useAuthStore } from '../../stores/authStore';
-import {
-  formatCurrency,
-  formatDateTime,
-  generateId,
-} from '../../utils';
-import { notify } from '../../stores/notificationStore';
-import { sound } from '../../utils/sound';
-import PlatformBadge from '../../components/PlatformBadge';
-import StatusBadge from '../../components/StatusBadge';
-import PaymentBadge from '../../components/PaymentBadge';
+} from "../../types";
+import { useOrderStore } from "../../stores/orderStore";
+import { useNavStore } from "../../stores/navStore";
+import { useMenuStore } from "../../stores/menuStore";
+import { useAuthStore } from "../../stores/authStore";
+import { formatCurrency, formatDateTime, generateId } from "../../utils";
+import { notify } from "../../stores/notificationStore";
+import { sound } from "../../utils/sound";
+import PlatformBadge from "../../components/PlatformBadge";
+import StatusBadge from "../../components/StatusBadge";
+import PaymentBadge from "../../components/PaymentBadge";
 import {
   ArrowLeftIcon,
   CheckCircleIcon,
@@ -35,23 +31,46 @@ import {
   RotateCcwIcon,
   TrashIcon,
   XCircleIcon,
-} from '../../utils/icons';
+} from "../../utils/icons";
 
 const ACTION_META: Record<
-  AuditLog['actionType'],
+  AuditLog["actionType"],
   { icon: string; label: string; color: string }
 > = {
-  ORDER_CREATED: { icon: 'plus', label: 'Pesanan dibuat', color: '#059669' },
-  ORDER_STATUS_CHANGED: { icon: 'clock', label: 'Status berubah', color: '#2563eb' },
-  ORDER_COMPLETED: { icon: 'check', label: 'Pesanan diselesaikan', color: '#059669' },
-  ORDER_CANCELLED: { icon: 'x', label: 'Pesanan dibatalkan', color: '#dc2626' },
-  ORDER_CORRECTED: { icon: 'pencil', label: 'Pesanan dikoreksi', color: '#ea580c' },
-  PAYMENT_UPDATED: { icon: 'card', label: 'Pembayaran diubah', color: '#7c3aed' },
-  DAY_CLOSED: { icon: 'lock', label: 'Hari ditutup', color: '#374151' },
-  DAY_REOPENED: { icon: 'rotate', label: 'Hari dibuka kembali', color: '#0284c7' },
+  ORDER_CREATED: { icon: "plus", label: "Pesanan dibuat", color: "#059669" },
+  ORDER_STATUS_CHANGED: {
+    icon: "clock",
+    label: "Status berubah",
+    color: "#2563eb",
+  },
+  ORDER_COMPLETED: {
+    icon: "check",
+    label: "Pesanan diselesaikan",
+    color: "#059669",
+  },
+  ORDER_CANCELLED: { icon: "x", label: "Pesanan dibatalkan", color: "#dc2626" },
+  ORDER_CORRECTED: {
+    icon: "pencil",
+    label: "Pesanan dikoreksi",
+    color: "#ea580c",
+  },
+  PAYMENT_UPDATED: {
+    icon: "card",
+    label: "Pembayaran diubah",
+    color: "#7c3aed",
+  },
+  DAY_CLOSED: { icon: "lock", label: "Hari ditutup", color: "#374151" },
+  DAY_REOPENED: {
+    icon: "rotate",
+    label: "Hari dibuka kembali",
+    color: "#0284c7",
+  },
 };
 
-const ACTION_ICON: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
+const ACTION_ICON: Record<
+  string,
+  React.ComponentType<{ size?: number; color?: string }>
+> = {
   plus: PlusIcon,
   clock: ClockIcon,
   check: CheckCircleIcon,
@@ -69,19 +88,14 @@ interface CorrectionItem {
   note: string;
 }
 
-function findProduct(
-  products: MenuProduct[],
-  id: string,
-) {
+function findProduct(products: MenuProduct[], id: string) {
   return products.find((p) => p.id === id);
 }
 
 export default function OrderDetailPage() {
   const orderId = useNavStore((s) => s.orderDetailId);
   const closeOrderDetail = useNavStore((s) => s.closeOrderDetail);
-  const order = useOrderStore((s) =>
-    s.orders.find((o) => o.id === orderId),
-  );
+  const order = useOrderStore((s) => s.orders.find((o) => o.id === orderId));
   const auditLogs = useOrderStore((s) => s.auditLogs);
   const closedDays = useOrderStore((s) => s.closedDays);
   const changeStatus = useOrderStore((s) => s.changeStatus);
@@ -93,24 +107,24 @@ export default function OrderDetailPage() {
 
   const [voidOpen, setVoidOpen] = useState(false);
   const [paymentReasonOpen, setPaymentReasonOpen] = useState(false);
-  const [reason, setReason] = useState('');
-  const [reasonError, setReasonError] = useState('');
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [actionError, setActionError] = useState('');
+  const [actionError, setActionError] = useState("");
 
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionItems, setCorrectionItems] = useState<CorrectionItem[]>([]);
-  const [correctionSource, setCorrectionSource] = useState<OrderSource>('grab');
-  const [correctionExt, setCorrectionExt] = useState('');
-  const [correctionCustomer, setCorrectionCustomer] = useState('');
+  const [correctionSource, setCorrectionSource] = useState<OrderSource>("grab");
+  const [correctionExt, setCorrectionExt] = useState("");
+  const [correctionCustomer, setCorrectionCustomer] = useState("");
   const [correctionPayment, setCorrectionPayment] =
-    useState<PaymentStatus>('dibayar');
-  const [correctionNotes, setCorrectionNotes] = useState('');
-  const [correctionReason, setCorrectionReason] = useState('');
-  const [correctionError, setCorrectionError] = useState('');
+    useState<PaymentStatus>("dibayar");
+  const [correctionNotes, setCorrectionNotes] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [correctionError, setCorrectionError] = useState("");
 
-  const isOwner = user?.role === 'owner' || user?.role === 'super_admin';
-  const isStaff = user?.role === 'staff';
+  const isOwner = user?.role === "owner" || user?.role === "super_admin";
+  const isStaff = user?.role === "staff";
 
   const orderLogs = useMemo(
     () =>
@@ -158,82 +172,102 @@ export default function OrderDetailPage() {
   }
 
   const isClosed = closedDays.includes(order.dayKey);
-  const isFinal = order.status === 'selesai' || order.status === 'dibatalkan';
+  const isFinal = order.status === "selesai" || order.status === "dibatalkan";
   const itemCount = order.items.reduce((s, i) => s + i.quantity, 0);
 
   const handleStatusChange = async (status: OrderStatus) => {
-    setActionError('');
+    setActionError("");
     const res = await changeStatus(order.id, status);
     if (!res.ok) {
-      setActionError(res.error ?? 'Gagal mengubah status pesanan');
-      notify.error(res.error ?? 'Gagal mengubah status pesanan', 'Gagal');
+      setActionError(res.error ?? "Gagal mengubah status pesanan");
+      notify.error(res.error ?? "Gagal mengubah status pesanan", "Gagal");
       return;
     }
-    if (status === 'diproses') {
+    if (status === "diproses") {
       sound.notification();
-      notify.info(`Pesanan #${order.orderNumber} mulai diproses di dapur.`, 'Pesanan Diproses');
-    } else if (status === 'selesai') {
+      notify.info(
+        `Pesanan #${order.orderNumber} mulai diproses di dapur.`,
+        "Pesanan Diproses",
+      );
+    } else if (status === "selesai") {
       sound.success();
-      notify.success(`Pesanan #${order.orderNumber} telah selesai!`, 'Pesanan Selesai');
+      notify.success(
+        `Pesanan #${order.orderNumber} telah selesai!`,
+        "Pesanan Selesai",
+      );
     }
   };
 
   const handleVoid = async () => {
     if (!reason.trim()) {
-      setReasonError('Alasan pembatalan wajib diisi');
+      setReasonError("Alasan pembatalan wajib diisi");
       return;
     }
     setSubmitting(true);
-    setActionError('');
-    const res = await changeStatus(order.id, 'dibatalkan', reason);
+    setActionError("");
+    const res = await changeStatus(order.id, "dibatalkan", reason);
     if (!res.ok) {
-      setReasonError(res.error ?? 'Gagal membatalkan');
-      setActionError(res.error ?? 'Gagal membatalkan pesanan');
-      notify.error(res.error ?? 'Gagal membatalkan pesanan', 'Pembatalan Gagal');
+      setReasonError(res.error ?? "Gagal membatalkan");
+      setActionError(res.error ?? "Gagal membatalkan pesanan");
+      notify.error(
+        res.error ?? "Gagal membatalkan pesanan",
+        "Pembatalan Gagal",
+      );
       setSubmitting(false);
       return;
     }
-    notify.danger(`Pesanan #${order.orderNumber} telah dibatalkan.`, 'Pesanan Dibatalkan');
+    notify.danger(
+      `Pesanan #${order.orderNumber} telah dibatalkan.`,
+      "Pesanan Dibatalkan",
+    );
     setVoidOpen(false);
-    setReason('');
-    setReasonError('');
+    setReason("");
+    setReasonError("");
     setSubmitting(false);
   };
 
   const handlePaymentToggle = async () => {
-    setActionError('');
+    setActionError("");
     if (isClosed) {
       setPaymentReasonOpen(true);
       return;
     }
-    const nextLabel = order.paymentStatus === 'dibayar' ? 'Belum Dibayar' : 'Dibayar';
+    const nextLabel =
+      order.paymentStatus === "dibayar" ? "Belum Dibayar" : "Dibayar";
     const res = togglePayment(order.id);
     if (!res.ok) {
-      setActionError(res.error ?? 'Gagal mengubah pembayaran');
-      notify.error(res.error ?? 'Gagal mengubah status pembayaran', 'Gagal');
+      setActionError(res.error ?? "Gagal mengubah pembayaran");
+      notify.error(res.error ?? "Gagal mengubah status pembayaran", "Gagal");
       return;
     }
-    notify.success(`Status pembayaran #${order.orderNumber} diubah ke ${nextLabel}.`, 'Pembayaran Diperbarui');
+    notify.success(
+      `Status pembayaran #${order.orderNumber} diubah ke ${nextLabel}.`,
+      "Pembayaran Diperbarui",
+    );
   };
 
   const handlePaymentReason = async () => {
     if (!reason.trim()) {
-      setReasonError('Alasan wajib diisi');
+      setReasonError("Alasan wajib diisi");
       return;
     }
     setSubmitting(true);
-    const nextLabel = order.paymentStatus === 'dibayar' ? 'Belum Dibayar' : 'Dibayar';
+    const nextLabel =
+      order.paymentStatus === "dibayar" ? "Belum Dibayar" : "Dibayar";
     const res = togglePayment(order.id, reason);
     if (!res.ok) {
-      setReasonError(res.error ?? 'Gagal mengubah pembayaran');
-      notify.error(res.error ?? 'Gagal mengubah status pembayaran', 'Gagal');
+      setReasonError(res.error ?? "Gagal mengubah pembayaran");
+      notify.error(res.error ?? "Gagal mengubah status pembayaran", "Gagal");
       setSubmitting(false);
       return;
     }
-    notify.success(`Status pembayaran #${order.orderNumber} diubah ke ${nextLabel}.`, 'Pembayaran Diperbarui');
+    notify.success(
+      `Status pembayaran #${order.orderNumber} diubah ke ${nextLabel}.`,
+      "Pembayaran Diperbarui",
+    );
     setPaymentReasonOpen(false);
-    setReason('');
-    setReasonError('');
+    setReason("");
+    setReasonError("");
     setSubmitting(false);
   };
 
@@ -243,22 +277,22 @@ export default function OrderDetailPage() {
         menuId: i.menuId,
         quantity: i.quantity,
         addonIds: i.addons.map((a) => a.id),
-        note: i.note ?? '',
+        note: i.note ?? "",
       })),
     );
     setCorrectionSource(order.source);
-    setCorrectionExt(order.externalOrderNumber ?? '');
-    setCorrectionCustomer(order.customerName ?? '');
+    setCorrectionExt(order.externalOrderNumber ?? "");
+    setCorrectionCustomer(order.customerName ?? "");
     setCorrectionPayment(order.paymentStatus);
-    setCorrectionNotes(order.notes ?? '');
-    setCorrectionReason('');
-    setCorrectionError('');
+    setCorrectionNotes(order.notes ?? "");
+    setCorrectionReason("");
+    setCorrectionError("");
     setCorrectionOpen(true);
   };
 
   const saveCorrection = () => {
     if (!correctionReason.trim()) {
-      setCorrectionError('Alasan koreksi wajib diisi');
+      setCorrectionError("Alasan koreksi wajib diisi");
       return;
     }
     const items: OrderItem[] = correctionItems
@@ -268,7 +302,12 @@ export default function OrderDetailPage() {
         const itemAddons = item.addonIds
           .map((id) => addons.find((a) => a.id === id))
           .filter((a): a is NonNullable<typeof a> => Boolean(a))
-          .map((a) => ({ id: a.id, name: a.name, price: a.price, quantity: 1 }));
+          .map((a) => ({
+            id: a.id,
+            name: a.name,
+            price: a.price,
+            quantity: 1,
+          }));
         return {
           id: generateId(),
           menuId: product.id,
@@ -285,7 +324,7 @@ export default function OrderDetailPage() {
       .filter((i): i is NonNullable<typeof i> => Boolean(i));
 
     if (items.length === 0) {
-      setCorrectionError('Minimal 1 item');
+      setCorrectionError("Minimal 1 item");
       return;
     }
 
@@ -302,14 +341,17 @@ export default function OrderDetailPage() {
       correctionReason,
     );
     if (!res.ok) {
-      setCorrectionError(res.error ?? 'Gagal menyimpan koreksi');
-      notify.error(res.error ?? 'Gagal menyimpan koreksi pesanan', 'Koreksi Gagal');
+      setCorrectionError(res.error ?? "Gagal menyimpan koreksi");
+      notify.error(
+        res.error ?? "Gagal menyimpan koreksi pesanan",
+        "Koreksi Gagal",
+      );
       return;
     }
     sound.success();
     notify.success(
       `Perubahan pesanan #${order.orderNumber} berhasil disimpan.`,
-      'Pesanan Dikoreksi',
+      "Pesanan Dikoreksi",
     );
     setCorrectionOpen(false);
   };
@@ -333,8 +375,8 @@ export default function OrderDetailPage() {
           <div className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg px-4 py-2.5 text-xs flex items-start gap-2">
             <LockIcon size={14} className="shrink-0 mt-0.5" />
             <span>
-              Hari ini sudah ditutup ({order.dayKey}). Perubahan memerlukan alasan
-              dan akan tercatat di audit.
+              Hari ini sudah ditutup ({order.dayKey}). Perubahan memerlukan
+              alasan dan akan tercatat di audit.
             </span>
           </div>
         )}
@@ -348,26 +390,32 @@ export default function OrderDetailPage() {
                 ⚡ Pesanan Sedang Diproses di Dapur!
               </p>
               <p className="text-xs text-info-700 dark:text-info-300 mt-0.5">
-                Makanan sedang disiapkan. Segera selesaikan dan tekan tombol <strong>Tandai Selesai</strong> di bawah jika pesanan sudah siap disajikan.
+                Makanan sedang disiapkan. Segera selesaikan dan tekan tombol{" "}
+                <strong>Tandai Selesai</strong> di bawah jika pesanan sudah siap
+                disajikan.
               </p>
             </div>
           </div>
         )}
 
         {/* Banner highlight jika pesanan sudah selesai tapi belum bayar */}
-        {order.status === "selesai" && order.paymentStatus === "belum_dibayar" && (
-          <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-warning-50 dark:bg-warning-950/60 border-2 border-warning-400 dark:border-warning-600 text-warning-950 dark:text-warning-100 shadow-sm">
-            <span className="w-3 h-3 rounded-full bg-warning-500 animate-ping shrink-0" />
-            <div className="flex-1">
-              <p className="font-bold text-sm text-warning-900 dark:text-warning-200">
-                ⚠️ Pesanan Selesai — Belum Dibayar!
-              </p>
-              <p className="text-xs text-warning-800 dark:text-warning-300 mt-0.5">
-                Makanan sudah disajikan. Tagihan sebesar <strong>{formatCurrency(order.total)}</strong> belum dibayar. Harap segera terima pembayaran dan tekan tombol <strong>Tandai Dibayar</strong> di bawah.
-              </p>
+        {order.status === "selesai" &&
+          order.paymentStatus === "belum_dibayar" && (
+            <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-warning-50 dark:bg-warning-950/60 border-2 border-warning-400 dark:border-warning-600 text-warning-950 dark:text-warning-100 shadow-sm">
+              <span className="w-3 h-3 rounded-full bg-warning-500 animate-ping shrink-0" />
+              <div className="flex-1">
+                <p className="font-bold text-sm text-warning-900 dark:text-warning-200">
+                  ⚠️ Pesanan Selesai — Belum Dibayar!
+                </p>
+                <p className="text-xs text-warning-800 dark:text-warning-300 mt-0.5">
+                  Makanan sudah disajikan. Tagihan sebesar{" "}
+                  <strong>{formatCurrency(order.total)}</strong> belum dibayar.
+                  Harap segera terima pembayaran dan tekan tombol{" "}
+                  <strong>Tandai Dibayar</strong> di bawah.
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Header card */}
         <section
@@ -413,7 +461,9 @@ export default function OrderDetailPage() {
 
           <div className="grid grid-cols-3 gap-3 mt-4 border-t border-gray-100 dark:border-gray-700 pt-3">
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Subtotal</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Subtotal
+              </p>
               <p className="font-semibold text-sm dark:text-gray-100">
                 {formatCurrency(order.subtotal)}
               </p>
@@ -494,7 +544,8 @@ export default function OrderDetailPage() {
           </div>
           {order.customerName && (
             <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300">
-              Pelanggan: <span className="font-medium">{order.customerName}</span>
+              Pelanggan:{" "}
+              <span className="font-medium">{order.customerName}</span>
             </div>
           )}
           {order.notes && (
@@ -515,28 +566,17 @@ export default function OrderDetailPage() {
             {order.status === "baru" && (
               <button
                 onClick={() => handleStatusChange("diproses")}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-info to-info-700 text-white font-semibold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-sm shadow-info/25"
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-info to-info-700 text-white font-bold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-sm shadow-info/25"
               >
                 Mulai Proses
               </button>
             )}
-            <button
-              onClick={() => handleStatusChange("selesai")}
-              className={`w-full py-3 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-semibold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-sm shadow-primary/25 ${
-                order.status === "diproses"
-                  ? "ring-2 ring-primary-500 ring-offset-2 shadow-md shadow-primary/40 font-bold"
-                  : ""
-              }`}
-            >
-              Tandai Selesai
-            </button>
-            {order.paymentStatus === "belum_dibayar" && (
+            {order.status === "diproses" && (
               <button
-                onClick={handlePaymentToggle}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-secondary-50 dark:bg-secondary-950/40 text-secondary-700 dark:text-secondary-300 font-medium text-xs cursor-pointer hover:bg-secondary-100 dark:hover:bg-secondary-900/40 border border-secondary-200 dark:border-secondary-800/60 active:scale-98 transition-all"
+                onClick={() => handleStatusChange("selesai")}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-bold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-sm shadow-primary/25 ring-2 ring-primary-500 ring-offset-2 shadow-md shadow-primary/40"
               >
-                <CreditCardIcon size={14} />
-                Terima Pembayaran di Muka (Tandai Dibayar)
+                Tandai Selesai
               </button>
             )}
             <button
@@ -550,28 +590,32 @@ export default function OrderDetailPage() {
 
         {isFinal && (
           <section className="flex flex-col gap-2">
-            <button
-              onClick={handlePaymentToggle}
-              className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm cursor-pointer transition-all border active:scale-98 ${
-                order.status === "selesai" && order.paymentStatus === "belum_dibayar"
-                  ? "bg-gradient-to-r from-warning-500 via-amber-500 to-warning-600 hover:from-warning-600 hover:to-amber-700 text-white border-warning-600 shadow-md shadow-warning-500/30 ring-2 ring-warning-400 ring-offset-2 animate-pulse"
-                  : "bg-secondary-50 dark:bg-secondary-950/40 text-secondary-700 dark:text-secondary-300 font-semibold border border-secondary-200 dark:border-secondary-800/60 hover:bg-secondary-100 dark:hover:bg-secondary-900/40"
-              }`}
-            >
-              <CreditCardIcon
-                size={18}
-                className={
-                  order.status === "selesai" && order.paymentStatus === "belum_dibayar"
-                    ? "animate-bounce"
-                    : ""
-                }
-              />
-              {order.paymentStatus === "dibayar"
-                ? "Tandai Belum Dibayar"
-                : order.status === "selesai"
-                  ? "Tandai Sudah Dibayar (Wajib Bayar)"
-                  : "Tandai Dibayar"}
-            </button>
+            {order.status !== "dibatalkan" && (
+              <button
+                onClick={handlePaymentToggle}
+                className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm cursor-pointer transition-all border active:scale-98 ${
+                  order.status === "selesai" &&
+                  order.paymentStatus === "belum_dibayar"
+                    ? "bg-gradient-to-r from-warning-500 via-amber-500 to-warning-600 hover:from-warning-600 hover:to-amber-700 text-white border-warning-600 shadow-md shadow-warning-500/30 ring-2 ring-warning-400 ring-offset-2 animate-pulse"
+                    : "bg-secondary-50 dark:bg-secondary-950/40 text-secondary-700 dark:text-secondary-300 font-semibold border border-secondary-200 dark:border-secondary-800/60 hover:bg-secondary-100 dark:hover:bg-secondary-900/40"
+                }`}
+              >
+                <CreditCardIcon
+                  size={18}
+                  className={
+                    order.status === "selesai" &&
+                    order.paymentStatus === "belum_dibayar"
+                      ? "animate-bounce"
+                      : ""
+                  }
+                />
+                {order.paymentStatus === "dibayar"
+                  ? "Tandai Belum Dibayar"
+                  : order.status === "selesai"
+                    ? "Tandai Sudah Dibayar (Wajib Bayar)"
+                    : "Tandai Dibayar"}
+              </button>
+            )}
             {isOwner && (
               <button
                 onClick={openCorrection}
@@ -583,8 +627,8 @@ export default function OrderDetailPage() {
             )}
 
             {/* Tombol Batalkan Pesanan untuk Pesanan Selesai */}
-            {order.status === "selesai" && (
-              isStaff ? (
+            {order.status === "selesai" &&
+              (isStaff ? (
                 <div className="flex flex-col gap-1 mt-1">
                   <button
                     type="button"
@@ -606,14 +650,7 @@ export default function OrderDetailPage() {
                 >
                   Batalkan Pesanan
                 </button>
-              )
-            )}
-
-            {order.status === "dibatalkan" && (
-              <p className="text-xs text-center text-danger dark:text-danger-400">
-                Pesanan ini dibatalkan dan bersifat final.
-              </p>
-            )}
+              ))}
           </section>
         )}
 
@@ -635,10 +672,7 @@ export default function OrderDetailPage() {
               const meta = ACTION_META[log.actionType];
               const Icon = ACTION_ICON[meta.icon] ?? ClockIcon;
               return (
-                <div
-                  key={log.id}
-                  className="flex gap-3 items-start"
-                >
+                <div key={log.id} className="flex gap-3 items-start">
                   <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center shrink-0">
                     <Icon size={15} color={meta.color} />
                   </div>
@@ -659,28 +693,32 @@ export default function OrderDetailPage() {
                         Alasan: {log.reason}
                       </span>
                     )}
-                    {log.actionType === 'ORDER_STATUS_CHANGED' && (
+                    {log.actionType === "ORDER_STATUS_CHANGED" && (
                       <span className="text-xs text-gray-600 dark:text-gray-300">
                         {String(log.oldValue)} → {String(log.newValue)}
                       </span>
                     )}
-                    {log.actionType === 'PAYMENT_UPDATED' && (
+                    {log.actionType === "PAYMENT_UPDATED" && (
                       <span className="text-xs text-gray-600 dark:text-gray-300">
                         {String(log.oldValue)} → {String(log.newValue)}
                       </span>
                     )}
-                    {log.actionType === 'ORDER_CORRECTED' &&
-                      typeof log.oldValue === 'object' &&
+                    {log.actionType === "ORDER_CORRECTED" &&
+                      typeof log.oldValue === "object" &&
                       log.oldValue !== null &&
-                      'total' in log.oldValue &&
-                      typeof log.newValue === 'object' &&
+                      "total" in log.oldValue &&
+                      typeof log.newValue === "object" &&
                       log.newValue !== null &&
-                      'total' in log.newValue && (
+                      "total" in log.newValue && (
                         <span className="text-xs text-gray-600 dark:text-gray-300">
-                          Total:{' '}
-                          {formatCurrency(Number((log.oldValue as { total: number }).total))}{' '}
-                          →{' '}
-                          {formatCurrency(Number((log.newValue as { total: number }).total))}
+                          Total:{" "}
+                          {formatCurrency(
+                            Number((log.oldValue as { total: number }).total),
+                          )}{" "}
+                          →{" "}
+                          {formatCurrency(
+                            Number((log.newValue as { total: number }).total),
+                          )}
                         </span>
                       )}
                   </div>
@@ -703,7 +741,7 @@ export default function OrderDetailPage() {
             Batalkan <b>{order.orderNumber}</b>? Pembatalan tercatat permanen di
             riwayat audit dan tidak dapat dihapus.
           </p>
-          {order.status === 'selesai' && isStaff && (
+          {order.status === "selesai" && isStaff && (
             <div className="p-2.5 rounded-lg bg-warning-50 dark:bg-warning-950/40 border border-warning-200 dark:border-warning-800 text-xs text-warning-800 dark:text-warning-300 font-medium">
               Hanya super admin yang dapat membatalkan pesanan selesai
             </div>
@@ -713,10 +751,10 @@ export default function OrderDetailPage() {
             value={reason}
             onChange={(e) => {
               setReason(e.target.value);
-              setReasonError('');
+              setReasonError("");
             }}
             minRows={3}
-            disabled={submitting || (order.status === 'selesai' && isStaff)}
+            disabled={submitting || (order.status === "selesai" && isStaff)}
           />
           {reasonError && (
             <span className="text-xs text-danger">{reasonError}</span>
@@ -729,7 +767,7 @@ export default function OrderDetailPage() {
               Batal
             </button>
             <button
-              disabled={submitting || (order.status === 'selesai' && isStaff)}
+              disabled={submitting || (order.status === "selesai" && isStaff)}
               onClick={handleVoid}
               className="flex-1 py-2.5 rounded-lg bg-danger text-white text-sm font-semibold cursor-pointer hover:opacity-90 transition-opacity border-0 disabled:opacity-60 disabled:cursor-not-allowed"
             >
@@ -755,7 +793,7 @@ export default function OrderDetailPage() {
             value={reason}
             onChange={(e) => {
               setReason(e.target.value);
-              setReasonError('');
+              setReasonError("");
             }}
             minRows={3}
           />
@@ -787,7 +825,7 @@ export default function OrderDetailPage() {
         title="Koreksi Pesanan"
         centered
         size="lg"
-        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+        styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}
       >
         <div className="flex flex-col gap-4">
           <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -869,10 +907,7 @@ export default function OrderDetailPage() {
                           const next = [...correctionItems];
                           next[index] = {
                             ...next[index],
-                            quantity: Math.max(
-                              1,
-                              next[index].quantity - 1,
-                            ),
+                            quantity: Math.max(1, next[index].quantity - 1),
                           };
                           setCorrectionItems(next);
                         }}
@@ -935,8 +970,8 @@ export default function OrderDetailPage() {
                             }}
                             className={`px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer ${
                               checked
-                                ? 'bg-primary border-primary text-white'
-                                : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300'
+                                ? "bg-primary border-primary text-white"
+                                : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300"
                             }`}
                           >
                             +{addon.name}
@@ -988,18 +1023,18 @@ export default function OrderDetailPage() {
               Pembayaran
             </label>
             <div className="flex gap-2">
-              {(['dibayar', 'belum_dibayar'] as const).map((status) => (
+              {(["dibayar", "belum_dibayar"] as const).map((status) => (
                 <button
                   key={status}
                   type="button"
                   onClick={() => setCorrectionPayment(status)}
                   className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors cursor-pointer ${
                     correctionPayment === status
-                      ? 'bg-primary border-primary text-white'
-                      : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200'
+                      ? "bg-primary border-primary text-white"
+                      : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200"
                   }`}
                 >
-                  {status === 'dibayar' ? 'Dibayar' : 'Belum Dibayar'}
+                  {status === "dibayar" ? "Dibayar" : "Belum Dibayar"}
                 </button>
               ))}
             </div>
@@ -1023,7 +1058,7 @@ export default function OrderDetailPage() {
               value={correctionReason}
               onChange={(e) => {
                 setCorrectionReason(e.target.value);
-                setCorrectionError('');
+                setCorrectionError("");
               }}
               minRows={3}
             />

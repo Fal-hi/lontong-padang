@@ -114,8 +114,10 @@ export const CHART_TOOLTIP_STYLE = {
 } as const;
 
 export const STORAGE_KEYS = {
-  AUTH: "ricebox-auth",
-  THEME: "ricebox-theme",
-  ORDERS: "ricebox-orders",
-  MENU: "ricebox-menu",
+  AUTH: "lonpad-jauh-auth",
+  THEME: "lonpad-jauh-theme",
+  ORDERS: "lonpad-jauh-orders",
+  MENU: "lonpad-jauh-menu",
+  STORE: "lonpad-jauh-store",
+  REMEMBERED_EMAIL: "lonpad-jauh-remembered-email",
 } as const;

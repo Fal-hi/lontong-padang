@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Store } from '../types';
+import { STORAGE_KEYS } from '../constants';
 import { mockStore } from '../mock';
 import { storeService } from '../services/supabaseService';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -38,7 +39,7 @@ export const useStoreStore = create<StoreState>()(
       },
     }),
     {
-      name: 'ricebox-store',
+      name: STORAGE_KEYS.STORE,
       version: 3,
       migrate: () => ({ store: mockStore }),
     },

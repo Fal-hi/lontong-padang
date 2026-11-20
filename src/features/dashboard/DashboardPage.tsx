@@ -474,7 +474,7 @@ export default function DashboardPage() {
                 Tidak ada pesanan yang sesuai filter.
               </div>
             )}
-            {filteredDashboardOrders.slice(0, 6).map((order) => (
+            {filteredDashboardOrders.slice(0, 3).map((order) => (
               <div
                 key={order.id}
                 onClick={() => openOrderDetail(order.id)}

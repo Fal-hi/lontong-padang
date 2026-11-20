@@ -383,7 +383,7 @@ export function buildMockOrders(): Order[] {
 
   for (let daysBack = 1; daysBack <= 34; daysBack += 1) {
     const dayKey = toDayKey(addDays(new Date(), -daysBack));
-    const rng = mulberry32(hashSeed(`ricebox-${dayKey}`));
+    const rng = mulberry32(hashSeed(`lonpad-jauh-${dayKey}`));
     const count = 5 + Math.floor(rng() * 6);
     for (let seq = 1; seq <= count; seq += 1) {
       orders.push(buildOrder({ dayKey, seq, rng }));
