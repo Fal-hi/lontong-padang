@@ -14,4 +14,27 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("recharts") || id.includes("@mantine/charts")) {
+              return "charts";
+            }
+            if (id.includes("@mantine") || id.includes("mantine-datatable")) {
+              return "mantine";
+            }
+            if (id.includes("@supabase")) {
+              return "supabase";
+            }
+            if (id.includes("lucide-react")) {
+              return "icons";
+            }
+            return "vendor";
+          }
+        },
+      },
+    },
+  },
 });
