@@ -17,10 +17,10 @@ import { todayKey, addDays, toDayKey, generateId } from '../utils';
 
 export const mockStore: Store = {
   id: 'store-1',
-  name: 'Lontong Padang Sakato',
+  name: 'Lonpad Jauh',
   currency: 'IDR',
-  address: 'Jl. Melati No. 12, Jakarta Selatan',
-  phone: '0812-3456-7890',
+  address: 'Jl. Mengger Hilir No.183, Sukapura, Kec. Dayeuhkolot, Kabupaten Bandung, Jawa Barat 40267',
+  phone: '082316321504',
   timezone: 'Asia/Jakarta',
 };
 
@@ -28,8 +28,8 @@ export const mockUser: User = {
   id: 'user-owner',
   storeId: mockStore.id,
   username: 'admin',
-  fullName: 'Budi Santoso',
-  email: 'admin@lontongpadang.id',
+  fullName: 'Mang Lontong',
+  email: 'email-pemilik@contoh.com',
   role: 'owner',
 };
 
@@ -38,7 +38,7 @@ export const mockStaffUser: User = {
   storeId: mockStore.id,
   username: 'staff',
   fullName: 'Siti Rahayu',
-  email: 'staff@lontongpadang.id',
+  email: 'email-staff@contoh.com',
   role: 'staff',
 };
 
@@ -398,7 +398,7 @@ export function buildMockOrders(): Order[] {
 export function buildMockAuditLogs(orders: Order[]): AuditLog[] {
   const logs: AuditLog[] = [];
   for (const order of orders) {
-    const userName = order.createdBy === 'user-staff' ? 'Siti Rahayu' : 'Budi Santoso';
+    const userName = order.createdBy === 'user-staff' ? 'Siti Rahayu' : 'Mang Lontong';
     logs.push(...buildAuditLogs(order, userName));
   }
   return logs.sort(

@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Modal, Textarea } from '@mantine/core';
 import {
   PageContainer,
   SectionTitle,
@@ -8,6 +9,8 @@ import {
 } from '../../components';
 import { useOrderStore, useDaySummary } from '../../stores/orderStore';
 import { useNavStore } from '../../stores/navStore';
+import { useAuthStore } from '../../stores/authStore';
+import { notify } from '../../stores/notificationStore';
 import {
   ORDER_SOURCES,
   ORDER_STATUS_OPTIONS,
@@ -15,6 +18,7 @@ import {
 } from '../../constants';
 import type {
   DateFilter,
+  Order,
   OrderStatus,
   PaymentStatus,
 } from '../../types';
@@ -48,6 +52,36 @@ export default function OrdersPage() {
   const setOrderFilter = useNavStore((s) => s.setOrderFilter);
   const navigateWithOrderFilter = useNavStore((s) => s.navigateWithOrderFilter);
   const resetOrderFilters = useNavStore((s) => s.resetOrderFilters);
+  const user = useAuthStore((s) => s.user);
+  const isStaff = user?.role === 'staff';
+  const changeStatus = useOrderStore((s) => s.changeStatus);
+
+  const [cancelModalOrder, setCancelModalOrder] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelError, setCancelError] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleConfirmCancel = async () => {
+    if (!cancelModalOrder) return;
+    if (!cancelReason.trim()) {
+      setCancelError('Alasan pembatalan wajib diisi');
+      return;
+    }
+    setCancelling(true);
+    setCancelError('');
+    const res = await changeStatus(cancelModalOrder.id, 'dibatalkan', cancelReason);
+    if (!res.ok) {
+      setCancelError(res.error ?? 'Gagal membatalkan pesanan');
+      notify.error(res.error ?? 'Gagal membatalkan pesanan', 'Pembatalan Gagal');
+      setCancelling(false);
+      return;
+    }
+    notify.danger(`Pesanan #${cancelModalOrder.orderNumber} telah dibatalkan.`, 'Pesanan Dibatalkan');
+    setCancelModalOrder(null);
+    setCancelReason('');
+    setCancelError('');
+    setCancelling(false);
+  };
 
   const {
     search,
@@ -95,13 +129,26 @@ export default function OrdersPage() {
     <PageContainer>
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <SectionTitle title="Pesanan" />
+          <div className="flex items-center gap-2">
+            <SectionTitle title="Pesanan" />
+            {isStaff && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300">
+                7 hari terakhir
+              </span>
+            )}
+          </div>
           {openCount > 0 && (
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-950 text-primary-700 dark:text-primary-300">
               {openCount} aktif
             </span>
           )}
         </div>
+
+        {isStaff && (
+          <div className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg px-3 py-1.5 flex items-center justify-between">
+            <span>Daftar pesanan dibatasi untuk <b>7 hari terakhir</b> (kebijakan keamanan peran staff). Riwayat omzet lebih lama dapat dilihat di menu Laporan.</span>
+          </div>
+        )}
 
         {/* Quick summary strip with interactive filter shortcuts (Total, Selesai, Dibatalkan, Belum Bayar) */}
         <div className="grid grid-cols-4 gap-1.5">
@@ -305,6 +352,12 @@ export default function OrdersPage() {
               key={order.id}
               order={order}
               onClick={() => openOrderDetail(order.id)}
+              onCancel={(ord) => {
+                setCancelModalOrder(ord);
+                setCancelReason('');
+                setCancelError('');
+              }}
+              isStaff={isStaff}
             />
           ))}
         </div>
@@ -323,6 +376,69 @@ export default function OrdersPage() {
           </div>
         )}
       </section>
+
+      {/* Modal Batalkan Pesanan dari Daftar */}
+      <Modal
+        opened={Boolean(cancelModalOrder)}
+        onClose={() => {
+          if (!cancelling) {
+            setCancelModalOrder(null);
+            setCancelReason('');
+            setCancelError('');
+          }
+        }}
+        title="Batalkan Pesanan"
+        centered
+      >
+        {cancelModalOrder && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Batalkan <b>{cancelModalOrder.orderNumber}</b>? Pembatalan tercatat permanen di riwayat audit.
+            </p>
+            {cancelModalOrder.status === 'selesai' && isStaff && (
+              <div className="p-2.5 rounded-lg bg-warning-50 dark:bg-warning-950/40 border border-warning-200 dark:border-warning-800 text-xs text-warning-800 dark:text-warning-300 font-medium">
+                Hanya super admin yang dapat membatalkan pesanan selesai
+              </div>
+            )}
+            <Textarea
+              placeholder="Alasan pembatalan (wajib)"
+              value={cancelReason}
+              onChange={(e) => {
+                setCancelReason(e.currentTarget.value);
+                setCancelError('');
+              }}
+              rows={3}
+              error={cancelError}
+              disabled={cancelling}
+            />
+            {cancelError && (
+              <span className="text-xs text-danger">{cancelError}</span>
+            )}
+            <div className="flex gap-2 justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelModalOrder(null);
+                  setCancelReason('');
+                  setCancelError('');
+                }}
+                disabled={cancelling}
+                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-300 cursor-pointer bg-transparent"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={cancelling || (cancelModalOrder.status === 'selesai' && isStaff)}
+                className="px-4 py-2 rounded-lg bg-danger text-white text-sm font-semibold cursor-pointer hover:bg-danger-600 disabled:opacity-50 disabled:cursor-not-allowed border-0"
+              >
+                {cancelling ? 'Memproses...' : 'Konfirmasi Batalkan'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Floating Action Button */}
       <div className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] left-0 right-0 max-w-md mx-auto pointer-events-none z-40 px-4 flex justify-end">

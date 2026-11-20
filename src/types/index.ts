@@ -16,7 +16,7 @@ export type NavPage =
 
 export type ColorScheme = 'light' | 'dark';
 
-export type UserRole = 'owner' | 'staff';
+export type UserRole = 'owner' | 'super_admin' | 'staff';
 
 export interface User {
   id: string;
@@ -26,6 +26,44 @@ export interface User {
   email: string;
   role: UserRole;
   avatar?: string;
+}
+
+export interface Expense {
+  id: string;
+  storeId: string;
+  category: string;
+  description: string;
+  amount: number;
+  expenseDate: string;
+  dayKey: string;
+  receiptUrl?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface DailySalesSummary {
+  dayKey: string;
+  totalOrders: number;
+  grossSales: number;
+  completedCount: number;
+  completedSales: number;
+  paidCompletedSales?: number;
+  cancelledCount: number;
+  cancelledAmount: number;
+  unpaidCount: number;
+  unpaidAmount: number;
+}
+
+export interface DailyFinancialSummary {
+  dayKey: string;
+  totalOrders: number;
+  grossSales: number;
+  completedSales: number;
+  paidCompletedSales?: number;
+  cancelledSales: number;
+  unpaidAmount: number;
+  totalExpense: number;
+  netProfit: number;
 }
 
 export interface Store {
@@ -38,13 +76,13 @@ export interface Store {
 }
 
 export interface LoginCredentials {
-  username: string;
+  email: string;
   password: string;
   rememberMe: boolean;
 }
 
 export interface LoginError {
-  field?: 'username' | 'password' | 'general';
+  field?: 'email' | 'password' | 'general';
   message: string;
 }
 
@@ -81,6 +119,7 @@ export interface Order {
   id: string; // internal UUID
   storeId: string;
   orderNumber: string; // internal, e.g. LP-20260803-0001
+  clientRequestId?: string; // Idempotency key
   externalOrderNumber?: string; // platform reference number
   source: OrderSource;
   customerName?: string;
@@ -100,6 +139,7 @@ export interface Order {
 
 export interface CreateOrderInput {
   storeId: string;
+  clientRequestId?: string;
   source: OrderSource;
   externalOrderNumber?: string;
   customerName?: string;
@@ -163,7 +203,8 @@ export type AuditAction =
   | 'ORDER_CANCELLED'
   | 'ORDER_CORRECTED'
   | 'PAYMENT_UPDATED'
-  | 'DAY_CLOSED';
+  | 'DAY_CLOSED'
+  | 'DAY_REOPENED';
 
 export interface AuditLog {
   id: string;

@@ -6,14 +6,21 @@ import Logo from '../../components/Logo';
 import { mockUser } from '../../mock';
 import { APP_VERSION, DEMO_CREDENTIALS, LOGIN_LOADING_MS } from '../../constants';
 import { notify } from '../../stores/notificationStore';
+import { authService } from '../../services/supabaseService';
+import { isSupabaseConfigured } from '../../lib/supabase';
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Nama pengguna wajib diisi'),
+  email: z
+    .string()
+    .min(1, 'Email wajib diisi')
+    .refine((val) => val.includes('@'), {
+      message: 'Gunakan alamat email untuk login',
+    }),
   password: z.string().min(1, 'Kata sandi wajib diisi'),
 });
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,10 +30,13 @@ export default function LoginPage() {
   const login = useAuthStore((s) => s.login);
   const navigate = useNavStore((s) => s.navigate);
 
+  const isMockMode = import.meta.env.DEV === true && import.meta.env.VITE_USE_MOCK === 'true';
+  const demoCredentials = isMockMode ? DEMO_CREDENTIALS : null;
+
   const handleLogin = async () => {
     setError(null);
 
-    const result = loginSchema.safeParse({ username, password });
+    const result = loginSchema.safeParse({ email: email.trim(), password });
     if (!result.success) {
       const firstError = result.error.issues[0];
       const errMsg = firstError?.message ?? 'Mohon isi semua kolom';
@@ -35,22 +45,61 @@ export default function LoginPage() {
       return;
     }
 
+    const cleanEmail = result.data.email;
+    const cleanPassword = result.data.password;
+
+    setLoading(true);
+
+    const isMockMode = import.meta.env.DEV === true && import.meta.env.VITE_USE_MOCK === 'true';
+
+    // 1. Try Supabase Auth if configured
+    if (isSupabaseConfigured) {
+      const { user, error: authError } = await authService.signIn(
+        cleanEmail,
+        cleanPassword,
+      );
+
+      if (user) {
+        login(user);
+        notify.success(`Selamat datang kembali, ${user.fullName}!`, 'Berhasil Masuk');
+        navigate('dashboard');
+        setLoading(false);
+        return;
+      }
+
+      // If Supabase returned an error and it's not the fallback demo credentials in mock mode
+      if (
+        !isMockMode ||
+        !DEMO_CREDENTIALS ||
+        cleanEmail !== DEMO_CREDENTIALS.email ||
+        cleanPassword !== DEMO_CREDENTIALS.password
+      ) {
+        const errMsg = authError ?? 'Email atau kata sandi salah';
+        setError(errMsg);
+        notify.danger(errMsg, 'Gagal Masuk');
+        setLoading(false);
+        return;
+      }
+    }
+
+    // 2. Demo credentials fallback (hanya aktif saat mode mock diizinkan di development)
     if (
-      result.data.username !== DEMO_CREDENTIALS.username ||
-      result.data.password !== DEMO_CREDENTIALS.password
+      isMockMode &&
+      DEMO_CREDENTIALS &&
+      cleanEmail === DEMO_CREDENTIALS.email &&
+      cleanPassword === DEMO_CREDENTIALS.password
     ) {
-      const errMsg = 'Nama pengguna atau kata sandi tidak cocok';
-      setError(errMsg);
-      notify.danger(errMsg, 'Gagal Masuk');
+      await new Promise((resolve) => setTimeout(resolve, LOGIN_LOADING_MS));
+      login(mockUser);
+      notify.success(`Selamat datang kembali, ${mockUser.fullName}! (Mode Demo)`, 'Berhasil Masuk');
+      navigate('dashboard');
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, LOGIN_LOADING_MS));
-
-    login(mockUser);
-    notify.success(`Selamat datang kembali, ${mockUser.fullName}!`, 'Berhasil Masuk');
-    navigate('dashboard');
+    const errMsg = 'Email atau kata sandi salah';
+    setError(errMsg);
+    notify.danger(errMsg, 'Gagal Masuk');
     setLoading(false);
   };
 
@@ -73,12 +122,12 @@ export default function LoginPage() {
 
           <div className="w-full flex flex-col gap-4">
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Nama Pengguna</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
               <input
-                type="text"
-                placeholder="Masukkan nama pengguna Anda"
-                value={username}
-                onChange={(e) => { setUsername(e.target.value); setError(null); }}
+                type="email"
+                placeholder="Masukkan email Anda"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(null); }}
                 autoComplete="username"
                 className="w-full py-2.5 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-primary transition-colors"
               />
@@ -123,23 +172,34 @@ export default function LoginPage() {
               {loading ? 'Masuk...' : 'Masuk'}
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setUsername(DEMO_CREDENTIALS.username);
-                setPassword(DEMO_CREDENTIALS.password);
-                setError(null);
-                notify.info('Akun demo (admin / 123456) diisi otomatis.', 'Kredensial Demo');
-              }}
-              className="w-full py-2 px-3 rounded-lg border border-primary-200 dark:border-primary-800/60 bg-primary-50/50 dark:bg-primary-950/20 text-primary-700 dark:text-primary-300 text-xs font-medium cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
-            >
-              Gunakan Akun Demo (admin / 123456)
-            </button>
+            {demoCredentials && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(demoCredentials.email);
+                  setPassword(demoCredentials.password);
+                  setError(null);
+                  notify.info(`Akun demo (${demoCredentials.email} / ${demoCredentials.password}) diisi otomatis.`, 'Kredensial Demo');
+                }}
+                className="w-full py-2 px-3 rounded-lg border border-primary-200 dark:border-primary-800/60 bg-primary-50/50 dark:bg-primary-950/20 text-primary-700 dark:text-primary-300 text-xs font-medium cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+              >
+                Gunakan Akun Demo ({demoCredentials.email} / {demoCredentials.password})
+              </button>
+            )}
           </div>
 
-          <span className="text-gray-500 dark:text-gray-400 text-xs text-center">
-            v{APP_VERSION}
-          </span>
+          <div className="flex flex-col items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+            <span
+              className={`px-2 py-0.5 rounded-full font-medium text-[11px] ${
+                isSupabaseConfigured
+                  ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800'
+                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+              }`}
+            >
+              {isSupabaseConfigured ? '🟢 Supabase Aktif' : '🟡 Mode Demo (Offline)'}
+            </span>
+            <span>v{APP_VERSION}</span>
+          </div>
         </div>
       </div>
     </div>

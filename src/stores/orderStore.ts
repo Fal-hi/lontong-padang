@@ -19,6 +19,8 @@ import {
 } from '../utils';
 import { mockAuditLogs, mockOrders } from '../mock';
 import { useAuthStore } from './authStore';
+import { orderService } from '../services/supabaseService';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 export interface ActionResult {
   ok: boolean;
@@ -29,12 +31,12 @@ interface OrderState {
   orders: Order[];
   auditLogs: AuditLog[];
   closedDays: string[];
-  addOrder: (input: CreateOrderInput) => Order;
+  addOrder: (input: CreateOrderInput) => Promise<{ order: Order; error?: string }>;
   changeStatus: (
     orderId: string,
     status: OrderStatus,
     reason?: string,
-  ) => ActionResult;
+  ) => Promise<ActionResult>;
   togglePayment: (orderId: string, reason?: string) => ActionResult;
   correctOrder: (
     orderId: string,
@@ -50,6 +52,7 @@ interface OrderState {
   ) => ActionResult;
   closeDay: (dayKey: string) => ActionResult;
   getDayOrders: (dayKey: string) => Order[];
+  syncOrdersFromSupabase: () => Promise<void>;
 }
 
 function currentUser() {
@@ -90,7 +93,19 @@ export const useOrderStore = create<OrderState>()(
       getDayOrders: (dayKey) =>
         get().orders.filter((o) => o.dayKey === dayKey),
 
-      addOrder: (input) => {
+      syncOrdersFromSupabase: async () => {
+        if (!isSupabaseConfigured) return;
+        try {
+          const remoteOrders = await orderService.fetchOrders();
+          if (remoteOrders.length > 0) {
+            set({ orders: remoteOrders });
+          }
+        } catch {
+          // Keep local orders
+        }
+      },
+
+      addOrder: async (input) => {
         const state = get();
         const orderDate = input.orderDate || new Date().toISOString();
         const dayKey = toDayKey(new Date(orderDate));
@@ -112,10 +127,11 @@ export const useOrderStore = create<OrderState>()(
         }));
 
         const user = currentUser();
-        const order: Order = {
+        const localOrder: Order = {
           id: generateId(),
           storeId: input.storeId,
           orderNumber,
+          clientRequestId: input.clientRequestId,
           externalOrderNumber: input.externalOrderNumber?.trim() || undefined,
           source: input.source,
           customerName: input.customerName?.trim() || undefined,
@@ -133,14 +149,28 @@ export const useOrderStore = create<OrderState>()(
           dayKey,
         };
 
+        if (isSupabaseConfigured) {
+          const res = await orderService.createOrder(input);
+          if (res.error) {
+            return { order: localOrder, error: res.error };
+          }
+          const finalOrder = res.order ? { ...localOrder, ...res.order } : localOrder;
+          set((s) => ({
+            orders: [finalOrder, ...s.orders.filter((o) => o.id !== finalOrder.id && o.id !== localOrder.id)],
+            auditLogs: [makeAuditLog('ORDER_CREATED', finalOrder), ...s.auditLogs],
+          }));
+          return { order: finalOrder };
+        }
+
         set((s) => ({
-          orders: [order, ...s.orders],
-          auditLogs: [makeAuditLog('ORDER_CREATED', order), ...s.auditLogs],
+          orders: [localOrder, ...s.orders],
+          auditLogs: [makeAuditLog('ORDER_CREATED', localOrder), ...s.auditLogs],
         }));
-        return order;
+
+        return { order: localOrder };
       },
 
-      changeStatus: (orderId, status, reason) => {
+      changeStatus: async (orderId, status, reason) => {
         const state = get();
         const order = state.orders.find((o) => o.id === orderId);
         if (!order) return { ok: false, error: 'Pesanan tidak ditemukan' };
@@ -149,12 +179,28 @@ export const useOrderStore = create<OrderState>()(
 
         const dayClosed = state.closedDays.includes(order.dayKey);
 
-        if (order.status === 'dibatalkan' || order.status === 'selesai') {
+        if (order.status === 'dibatalkan') {
           return {
             ok: false,
-            error:
-              'Pesanan selesai/dibatalkan bersifat final. Gunakan Koreksi Pesanan atau Batalkan Pesanan dengan alasan.',
+            error: 'Pesanan yang dibatalkan tidak dapat diubah statusnya.',
           };
+        }
+
+        // Restriksi: jika status pesanan 'selesai'
+        if (order.status === 'selesai') {
+          if (status !== 'dibatalkan') {
+            return {
+              ok: false,
+              error: 'Pesanan selesai bersifat final. Gunakan Koreksi Pesanan.',
+            };
+          }
+          const authUser = useAuthStore.getState().user;
+          if (authUser?.role === 'staff') {
+            return {
+              ok: false,
+              error: 'Akses Ditolak: Hanya super admin yang dapat membatalkan pesanan selesai.',
+            };
+          }
         }
 
         if (status === 'dibatalkan') {
@@ -169,6 +215,13 @@ export const useOrderStore = create<OrderState>()(
             error:
               'Hari sudah ditutup, perubahan status memerlukan alasan.',
           };
+        }
+
+        if (isSupabaseConfigured) {
+          const rpcRes = await orderService.changeStatus(orderId, status, reason);
+          if (!rpcRes.ok) {
+            return { ok: false, error: rpcRes.error };
+          }
         }
 
         const updated: Order = {
@@ -194,6 +247,7 @@ export const useOrderStore = create<OrderState>()(
             ...s.auditLogs,
           ],
         }));
+
         return { ok: true };
       },
 
@@ -230,6 +284,11 @@ export const useOrderStore = create<OrderState>()(
             ...s.auditLogs,
           ],
         }));
+
+        if (isSupabaseConfigured) {
+          void orderService.togglePayment(orderId, reason);
+        }
+
         return { ok: true };
       },
 
@@ -290,6 +349,11 @@ export const useOrderStore = create<OrderState>()(
             ...s.auditLogs,
           ],
         }));
+
+        if (isSupabaseConfigured) {
+          void orderService.correctOrder(orderId, correction, reason);
+        }
+
         return { ok: true };
       },
 
@@ -331,6 +395,11 @@ export const useOrderStore = create<OrderState>()(
             auditLogs: [log, ...s.auditLogs],
           };
         });
+
+        if (isSupabaseConfigured) {
+          void orderService.closeDay(dayKey);
+        }
+
         return { ok: true };
       },
     }),

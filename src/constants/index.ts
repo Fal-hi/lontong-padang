@@ -8,10 +8,12 @@ import type {
 export const APP_NAME = "Lontong Padang";
 export const APP_VERSION = "1.0.0";
 
-export const DEMO_CREDENTIALS = {
-  username: "admin",
-  password: "123456",
-} as const;
+export const DEMO_CREDENTIALS = (import.meta.env.DEV && import.meta.env.VITE_USE_MOCK === 'true')
+  ? {
+      email: "email-pemilik@contoh.com",
+      password: "123456",
+    }
+  : null;
 
 export const NAV_ITEMS: NavItem[] = [
   { page: "dashboard", label: "Dasbor", icon: "dashboard" },
@@ -23,10 +25,10 @@ export const NAV_ITEMS: NavItem[] = [
 ] as const;
 
 export const ORDER_SOURCES: Array<{ value: OrderSource; label: string }> = [
+  { value: "manual", label: "Manual" },
   { value: "grab", label: "GrabFood" },
   { value: "gofood", label: "GoFood" },
   { value: "shopeefood", label: "ShopeeFood" },
-  { value: "manual", label: "Manual" },
 ];
 
 export function getOrderSourceLabel(source: OrderSource): string {
@@ -88,7 +90,7 @@ export const DEFAULT_ADDONS = [
 export const CURRENCY = "IDR";
 export const CURRENCY_SYMBOL = "Rp";
 
-export const SPLASH_DURATION_MS = 2000;
+export const SPLASH_DURATION_MS = import.meta.env.DEV ? 0 : 1500;
 export const LOGIN_LOADING_MS = 800;
 
 // Centralized semantic chart palette (Mantine color tokens).

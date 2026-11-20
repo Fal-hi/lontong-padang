@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { PageContainer, AppAvatar, Toggle } from '../../components';
-import { useAuthStore } from '../../stores/authStore';
-import { useNavStore } from '../../stores/navStore';
-import { useThemeStore } from '../../stores/themeStore';
-import { useStoreStore } from '../../stores/storeStore';
-import { useSoundStore } from '../../stores/soundStore';
-import { notify } from '../../stores/notificationStore';
-import { sound } from '../../utils/sound';
-import { APP_VERSION } from '../../constants';
+import { useState } from "react";
+import { PageContainer, AppAvatar, Toggle } from "../../components";
+import { useAuthStore } from "../../stores/authStore";
+import { useNavStore } from "../../stores/navStore";
+import { useThemeStore } from "../../stores/themeStore";
+import { useStoreStore } from "../../stores/storeStore";
+import { useSoundStore } from "../../stores/soundStore";
+import { notify } from "../../stores/notificationStore";
+import { sound } from "../../utils/sound";
+import { APP_VERSION } from "../../constants";
 import {
   LogoutIcon,
   MoonIcon,
@@ -20,7 +20,7 @@ import {
   SaveIcon,
   VolumeIcon,
   VolumeMuteIcon,
-} from '../../utils/icons';
+} from "../../utils/icons";
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
@@ -36,19 +36,22 @@ export default function SettingsPage() {
   const toggleSound = useSoundStore((s) => s.toggleSound);
 
   const [notifications, setNotifications] = useState(true);
-  const [language, setLanguage] = useState('id');
+  const [language, setLanguage] = useState("id");
   const [storeName, setStoreName] = useState(store.name);
-  const [storeAddress, setStoreAddress] = useState(store.address ?? '');
-  const [storePhone, setStorePhone] = useState(store.phone ?? '');
+  const [storeAddress, setStoreAddress] = useState(store.address ?? "");
+  const [storePhone, setStorePhone] = useState(store.phone ?? "");
   const [saved, setSaved] = useState(false);
 
-  const isDark = colorScheme === 'dark';
-  const isOwner = user?.role === 'owner';
+  const isDark = colorScheme === "dark";
+  const isOwner = user?.role === "owner" || user?.role === "super_admin";
 
   const handleLogout = () => {
     logout();
-    notify.warning('Anda telah keluar dari aplikasi Lontong Padang.', 'Sesi Berakhir');
-    navigate('dashboard');
+    notify.warning(
+      "Anda telah keluar dari aplikasi Lontong Padang.",
+      "Sesi Berakhir",
+    );
+    navigate("dashboard");
   };
 
   const handleSaveStore = () => {
@@ -58,7 +61,10 @@ export default function SettingsPage() {
       phone: storePhone.trim(),
     });
     setSaved(true);
-    notify.success('Informasi profil toko berhasil diperbarui.', 'Pengaturan Disimpan');
+    notify.success(
+      "Informasi profil toko berhasil diperbarui.",
+      "Pengaturan Disimpan",
+    );
     setTimeout(() => setSaved(false), 2000);
   };
 
@@ -85,6 +91,7 @@ export default function SettingsPage() {
                 value={storeName}
                 onChange={(e) => setStoreName(e.target.value)}
                 className="w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-primary transition-colors"
+                readOnly={!isOwner}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -96,6 +103,7 @@ export default function SettingsPage() {
                 value={storeAddress}
                 onChange={(e) => setStoreAddress(e.target.value)}
                 className="w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-primary transition-colors"
+                readOnly={!isOwner}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -107,30 +115,38 @@ export default function SettingsPage() {
                 value={storePhone}
                 onChange={(e) => setStorePhone(e.target.value)}
                 className="w-full py-2 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-primary transition-colors"
+                readOnly={!isOwner}
               />
             </div>
             <div className="flex items-center gap-1.5 flex-wrap text-xs text-gray-500 dark:text-gray-400">
               <Building2Icon size={14} className="shrink-0" />
               <span>
-                Mata uang: IDR · Zona waktu: {store.timezone} · ID toko:{' '}
+                Mata uang: IDR · Zona waktu: {store.timezone} · ID toko:{" "}
                 {store.id}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={handleSaveStore}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-semibold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 flex items-center justify-center gap-2 shadow-sm shadow-primary/25"
-            >
-              {saved ? (
-                <>
-                  <BadgeCheckIcon size={16} /> Tersimpan
-                </>
-              ) : (
-                <>
-                  <SaveIcon size={16} /> Simpan Profil
-                </>
-              )}
-            </button>
+            {isOwner ? (
+              <button
+                type="button"
+                onClick={handleSaveStore}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-semibold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 flex items-center justify-center gap-2 shadow-sm shadow-primary/25"
+              >
+                {saved ? (
+                  <>
+                    <BadgeCheckIcon size={16} /> Tersimpan
+                  </>
+                ) : (
+                  <>
+                    <SaveIcon size={16} /> Simpan Profil
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2.5 rounded-lg border border-amber-200 dark:border-amber-800 text-center font-medium">
+                Profil warung hanya dapat diubah oleh peran pemilik
+                (super_admin).
+              </div>
+            )}
           </div>
         </div>
 
@@ -140,16 +156,16 @@ export default function SettingsPage() {
             <AppAvatar user={user} size="lg" />
             <div className="flex flex-col gap-0.5 min-w-0">
               <h6 className="font-semibold text-base dark:text-white truncate">
-                {user?.fullName ?? 'Pengguna'}
+                {user?.fullName ?? "Pengguna"}
               </h6>
               <span className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                {user?.email ?? ''}
+                {user?.email ?? ""}
               </span>
               <span
                 className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full w-fit ${
                   isOwner
-                    ? 'bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-300'
-                    : 'bg-info-100 dark:bg-info-900/30 text-info-700 dark:text-info-300'
+                    ? "bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-300"
+                    : "bg-info-100 dark:bg-info-900/30 text-info-700 dark:text-info-300"
                 }`}
               >
                 {isOwner ? (
@@ -157,20 +173,20 @@ export default function SettingsPage() {
                 ) : (
                   <BadgeCheckIcon size={12} />
                 )}
-                {isOwner ? 'Pemilik (Admin)' : 'Staf'}
+                {isOwner ? "Pemilik (Admin)" : "Staf"}
               </span>
             </div>
           </div>
 
           <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 flex flex-col gap-1">
             <p>
-              <b className="text-gray-600 dark:text-gray-300">Pemilik:</b>{' '}
-              kelola menu, koreksi/penutupan hari, laporan.
+              <b className="text-gray-600 dark:text-gray-300">Pemilik:</b>{" "}
+              kelola menu, pesanan, pengeluaran, penutupan hari, dan laporan
+              keuangan.
             </p>
             <p>
-              <b className="text-gray-600 dark:text-gray-300">Staf:</b>{' '}
-              catat &amp; proses pesanan. Struktur peran disiapkan untuk
-              diterapkan di backend nanti.
+              <b className="text-gray-600 dark:text-gray-300">Staf:</b>{" "}
+              tambah/ubah menu, catat &amp; proses pesanan.
             </p>
           </div>
         </div>
@@ -186,7 +202,7 @@ export default function SettingsPage() {
                     Mode Gelap
                   </p>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {isDark ? 'Tema gelap aktif' : 'Beralih ke tema gelap'}
+                    {isDark ? "Tema gelap aktif" : "Beralih ke tema gelap"}
                   </span>
                 </div>
               </div>
@@ -195,8 +211,10 @@ export default function SettingsPage() {
                 onChange={() => {
                   toggleTheme();
                   notify.info(
-                    isDark ? 'Mode terang diaktifkan.' : 'Mode gelap diaktifkan.',
-                    'Tema Tampilan',
+                    isDark
+                      ? "Mode terang diaktifkan."
+                      : "Mode gelap diaktifkan.",
+                    "Tema Tampilan",
                   );
                 }}
                 label="Mode Gelap"
@@ -210,7 +228,11 @@ export default function SettingsPage() {
                 {soundEnabled ? (
                   <VolumeIcon size={18} color="#059669" className="shrink-0" />
                 ) : (
-                  <VolumeMuteIcon size={18} color="#9ca3af" className="shrink-0" />
+                  <VolumeMuteIcon
+                    size={18}
+                    color="#9ca3af"
+                    className="shrink-0"
+                  />
                 )}
                 <div className="min-w-0">
                   <p className="font-medium text-sm dark:text-gray-200">
@@ -218,8 +240,8 @@ export default function SettingsPage() {
                   </p>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
                     {soundEnabled
-                      ? 'Lonceng pesanan & status aktif'
-                      : 'Efek suara dibisukan (hening)'}
+                      ? "Lonceng pesanan & status aktif"
+                      : "Efek suara dibisukan (hening)"}
                   </span>
                 </div>
               </div>
@@ -230,13 +252,13 @@ export default function SettingsPage() {
                   if (next) {
                     sound.preview();
                     notify.info(
-                      'Efek suara pesanan diaktifkan.',
-                      'Suara Notifikasi',
+                      "Efek suara pesanan diaktifkan.",
+                      "Suara Notifikasi",
                     );
                   } else {
                     notify.info(
-                      'Efek suara pesanan dinonaktifkan (hening).',
-                      'Suara Notifikasi',
+                      "Efek suara pesanan dinonaktifkan (hening).",
+                      "Suara Notifikasi",
                     );
                   }
                 }}
@@ -263,8 +285,10 @@ export default function SettingsPage() {
                 onChange={(e) => {
                   setLanguage(e.target.value);
                   notify.info(
-                    e.target.value === 'id' ? 'Bahasa Indonesia aktif' : 'English language selected',
-                    'Pengaturan Bahasa',
+                    e.target.value === "id"
+                      ? "Bahasa Indonesia aktif"
+                      : "English language selected",
+                    "Pengaturan Bahasa",
                   );
                 }}
                 className="text-xs py-1.5 px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-gray-200 w-[110px] shrink-0 outline-none"
@@ -294,8 +318,10 @@ export default function SettingsPage() {
                   setNotifications((v) => {
                     const next = !v;
                     notify.info(
-                      next ? 'Notifikasi push diaktifkan.' : 'Notifikasi push dinonaktifkan.',
-                      'Notifikasi',
+                      next
+                        ? "Notifikasi push diaktifkan."
+                        : "Notifikasi push dinonaktifkan.",
+                      "Notifikasi",
                     );
                     return next;
                   });

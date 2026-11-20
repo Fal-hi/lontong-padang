@@ -114,7 +114,7 @@ export default function DashboardPage() {
     [todayOrders],
   );
 
-  const isOwner = user?.role === "owner";
+  const isOwner = user?.role === "owner" || user?.role === "super_admin";
 
   const popularItems = useMemo(() => {
     const map = new Map<string, { name: string; quantity: number }>();
@@ -440,7 +440,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto pb-1 mt-1 hide-scrollbar">
+          <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto pb-4 mt-1 hide-scrollbar">
             <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mr-1 shrink-0">
               Pembayaran:
             </span>

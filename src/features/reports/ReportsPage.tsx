@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   PageContainer,
   StatCard,
@@ -8,10 +8,7 @@ import {
 } from "../../components";
 import { useOrderStore } from "../../stores/orderStore";
 import { useNavStore } from "../../stores/navStore";
-import {
-  CHART_COLORS,
-  ORDER_SOURCES,
-} from "../../constants";
+import { CHART_COLORS, ORDER_SOURCES } from "../../constants";
 import {
   addDays,
   computeDaySummary,
@@ -25,6 +22,10 @@ import { BarChart } from "@mantine/charts";
 import { useMediaQuery } from "@mantine/hooks";
 import { FileBarChartIcon, ChevronRightIcon } from "../../utils/icons";
 import PlatformBadge from "../../components/PlatformBadge";
+import { useAuthStore } from "../../stores/authStore";
+import { reportService } from "../../services/supabaseService";
+import { isSupabaseConfigured } from "../../lib/supabase";
+import type { DailySalesSummary } from "../../types";
 
 type Period = "today" | "week" | "month" | "all";
 
@@ -63,9 +64,51 @@ function periodLabel(period: Period): string {
 
 export default function ReportsPage() {
   const navigate = useNavStore((s) => s.navigate);
+  const user = useAuthStore((s) => s.user);
   const orders = useOrderStore((s) => s.orders);
   const [period, setPeriod] = useState<Period>("today");
   const isMobile = useMediaQuery("(max-width: 640px)");
+
+  const isStaff = user?.role === "staff";
+  const isOwner = user?.role === "owner" || user?.role === "super_admin";
+
+  const dateRange = useMemo(() => {
+    const today = todayKey();
+    if (period === "today") return { from: today, to: today };
+    if (period === "week")
+      return { from: toDayKey(addDays(new Date(), -6)), to: today };
+    if (period === "month")
+      return { from: `${today.slice(0, 7)}-01`, to: today };
+    return { from: toDayKey(addDays(new Date(), -365)), to: today };
+  }, [period]);
+
+  const isLongPeriod = period === "month" || period === "all";
+  const [rpcSalesSummary, setRpcSalesSummary] = useState<DailySalesSummary[]>(
+    [],
+  );
+  const [rpcBestSelling, setRpcBestSelling] = useState<
+    Array<{ menuId: string; name: string; quantity: number }>
+  >([]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    if (isLongPeriod) {
+      void reportService
+        .fetchSalesSummary(dateRange.from, dateRange.to)
+        .then(setRpcSalesSummary);
+      void reportService
+        .fetchBestSellingMenu(dateRange.from, dateRange.to)
+        .then((res) => {
+          setRpcBestSelling(
+            res.map((r) => ({
+              menuId: r.menuId,
+              name: r.name,
+              quantity: r.quantity,
+            })),
+          );
+        });
+    }
+  }, [isLongPeriod, dateRange.from, dateRange.to]);
 
   const filteredOrders = useMemo(() => {
     const today = todayKey();
@@ -79,12 +122,64 @@ export default function ReportsPage() {
     });
   }, [orders, period]);
 
-  const summary = useMemo(
+  const filteredOrdersSummary = useMemo(
     () => computeDaySummary(filteredOrders),
     [filteredOrders],
   );
 
+  const summary = useMemo(() => {
+    if (isLongPeriod && rpcSalesSummary.length > 0) {
+      const totalOrders = rpcSalesSummary.reduce(
+        (s, r) => s + r.totalOrders,
+        0,
+      );
+      const grossSales = rpcSalesSummary.reduce((s, r) => s + r.grossSales, 0);
+      const completedCount = rpcSalesSummary.reduce(
+        (s, r) => s + r.completedCount,
+        0,
+      );
+      const completedSales = rpcSalesSummary.reduce(
+        (s, r) => s + r.completedSales,
+        0,
+      );
+      const cancelledCount = rpcSalesSummary.reduce(
+        (s, r) => s + r.cancelledCount,
+        0,
+      );
+      const cancelledAmount = rpcSalesSummary.reduce(
+        (s, r) => s + r.cancelledAmount,
+        0,
+      );
+      const unpaidCount = rpcSalesSummary.reduce(
+        (s, r) => s + r.unpaidCount,
+        0,
+      );
+      const unpaidAmount = rpcSalesSummary.reduce(
+        (s, r) => s + r.unpaidAmount,
+        0,
+      );
+      const avgOrderValue =
+        totalOrders > 0 ? Math.round(grossSales / totalOrders) : 0;
+      return {
+        ...filteredOrdersSummary,
+        totalOrders,
+        grossSales,
+        completedCount,
+        completedSales,
+        cancelledCount,
+        cancelledAmount,
+        unpaidCount,
+        unpaidAmount,
+        avgOrderValue,
+      };
+    }
+    return filteredOrdersSummary;
+  }, [isLongPeriod, rpcSalesSummary, filteredOrdersSummary]);
+
   const bestSelling = useMemo(() => {
+    if (isLongPeriod && rpcBestSelling.length > 0) {
+      return rpcBestSelling.slice(0, 5);
+    }
     const map = new Map<string, { name: string; quantity: number }>();
     for (const order of filteredOrders) {
       if (order.status === "dibatalkan") continue;
@@ -102,11 +197,25 @@ export default function ReportsPage() {
       .map(([menuId, v]) => ({ menuId, ...v }))
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5);
-  }, [filteredOrders]);
+  }, [isLongPeriod, rpcBestSelling, filteredOrders]);
 
-  const weekSeries = useMemo(() => {
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const dayKey = toDayKey(addDays(new Date(), i - 6));
+  const chartSeries = useMemo(() => {
+    if (isLongPeriod && rpcSalesSummary.length > 0) {
+      return rpcSalesSummary
+        .slice()
+        .reverse()
+        .map((r) => ({
+          date: new Intl.DateTimeFormat("id-ID", {
+            day: "2-digit",
+            month: "short",
+          }).format(new Date(`${r.dayKey}T00:00:00`)),
+          penjualan: r.grossSales,
+          selesai: r.completedSales,
+        }));
+    }
+    const daysCount = period === "today" ? 1 : 7;
+    return Array.from({ length: daysCount }, (_, i) => {
+      const dayKey = toDayKey(addDays(new Date(), i - (daysCount - 1)));
       const s = computeDaySummary(orders.filter((o) => o.dayKey === dayKey));
       return {
         date: new Intl.DateTimeFormat("id-ID", { weekday: "short" }).format(
@@ -116,8 +225,7 @@ export default function ReportsPage() {
         selesai: s.completedSales,
       };
     });
-    return days;
-  }, [orders]);
+  }, [isLongPeriod, rpcSalesSummary, period, orders]);
 
   const stats = [
     {
@@ -167,7 +275,14 @@ export default function ReportsPage() {
   return (
     <PageContainer>
       <section className="flex flex-col gap-4">
-        <SectionTitle title="Laporan" />
+        <div className="flex items-center justify-between">
+          <SectionTitle title="Laporan Penjualan" />
+          {isStaff && (
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+              Staff
+            </span>
+          )}
+        </div>
 
         <div className="flex gap-1.5 flex-nowrap overflow-x-auto pb-1 hide-scrollbar">
           {PERIODS.map((p) => (
@@ -180,9 +295,21 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          {periodLabel(period)} · {filteredOrders.length} pesanan
-        </span>
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+          <span>{periodLabel(period)}</span>
+          {isOwner && isLongPeriod && (
+            <span className="text-teal-600 dark:text-teal-400 font-medium">
+              Agregat RPC get_sales_summary
+            </span>
+          )}
+        </div>
+
+        {isOwner && isLongPeriod && (
+          <div className="text-[11px] text-teal-700 dark:text-teal-300 bg-teal-50/80 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 rounded-lg px-3 py-1.5">
+            Menampilkan data omzet & grafik untuk rentang &gt; 7 hari yang
+            dihimpun dari server melalui <b>get_sales_summary</b>.
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2.5">
           {stats.map((stat) => (
@@ -191,11 +318,17 @@ export default function ReportsPage() {
         </div>
 
         <div>
-          <SectionTitle title="Pendapatan 7 Hari Terakhir" />
+          <SectionTitle
+            title={
+              isLongPeriod
+                ? `Grafik Penjualan (${periodLabel(period)})`
+                : "Pendapatan 7 Hari Terakhir"
+            }
+          />
           <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
             <BarChart
               h={isMobile ? 180 : 250}
-              data={weekSeries}
+              data={chartSeries}
               dataKey="date"
               series={[
                 {

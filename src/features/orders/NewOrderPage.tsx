@@ -1,15 +1,19 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useForm } from "@mantine/form";
 import { zod4Resolver } from "mantine-form-zod-resolver";
 import { z } from "zod";
 import type { MenuProduct, OrderSource, PaymentStatus } from "../../types";
-import { ORDER_SOURCES, getOrderSourceLabel, MENU_CATEGORIES } from "../../constants";
+import {
+  ORDER_SOURCES,
+  getOrderSourceLabel,
+  MENU_CATEGORIES,
+} from "../../constants";
 import { useMenuStore } from "../../stores/menuStore";
 import { useOrderStore } from "../../stores/orderStore";
 import { useNavStore } from "../../stores/navStore";
 import { useAuthStore } from "../../stores/authStore";
 import { useStoreStore } from "../../stores/storeStore";
-import { formatCurrency, computeOrderTotals } from "../../utils";
+import { formatCurrency, computeOrderTotals, generateUUID } from "../../utils";
 import { notify } from "../../stores/notificationStore";
 import { sound } from "../../utils/sound";
 import {
@@ -72,20 +76,53 @@ function findProduct(
 const sourceActiveStyles: Record<string, string> = {
   grab: "bg-primary border-primary text-white shadow-sm shadow-primary/30",
   gofood: "bg-danger border-danger text-white shadow-sm shadow-danger/30",
-  shopeefood: "bg-warning border-warning text-white shadow-sm shadow-warning/30",
+  shopeefood:
+    "bg-warning border-warning text-white shadow-sm shadow-warning/30",
   manual: "bg-info border-info text-white shadow-sm shadow-info/30",
 };
 
 export default function NewOrderPage() {
   const products = useMenuStore((s) => s.products);
-  const addons = useMenuStore((s) => s.addons);
+  const orders = useOrderStore((s) => s.orders);
   const addOrder = useOrderStore((s) => s.addOrder);
   const closeNewOrder = useNavStore((s) => s.closeNewOrder);
   const openOrderDetail = useNavStore((s) => s.openOrderDetail);
   const user = useAuthStore((s) => s.user);
   const store = useStoreStore((s) => s.store);
 
-  const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
+  const [selectedCategory, setSelectedCategory] = useState<string>("Lontong");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const clientRequestIdRef = useRef<string>(generateUUID());
+
+  const ORDER_MENU_CATEGORIES = MENU_CATEGORIES.filter((c) => c !== "Semua");
+
+  // Menghitung makanan yang sedang diproses di dapur dan belum selesai (status === 'diproses')
+  const inProgressFoodMap = useMemo(() => {
+    const map: Record<string, { orderCount: number; totalQty: number }> = {};
+    for (const order of orders) {
+      if (order.status?.toLowerCase?.() === "diproses") {
+        for (const item of order.items || []) {
+          const keys = [
+            item.menuId,
+            item.menuName ? item.menuName.toLowerCase().trim() : "",
+          ].filter(Boolean);
+
+          for (const key of keys) {
+            if (!map[key]) {
+              map[key] = { orderCount: 0, totalQty: 0 };
+            }
+            map[key].orderCount += 1;
+            map[key].totalQty += item.quantity;
+          }
+        }
+      }
+    }
+    return map;
+  }, [orders]);
+
+  const totalInProgressOrders = useMemo(() => {
+    return orders.filter((o) => o.status?.toLowerCase?.() === "diproses").length;
+  }, [orders]);
 
   const activeProducts = useMemo(
     () => products.filter((p) => p.active),
@@ -93,14 +130,13 @@ export default function NewOrderPage() {
   );
 
   const displayedProducts = useMemo(() => {
-    if (selectedCategory === 'Semua') return activeProducts;
     return activeProducts.filter((p) => p.category === selectedCategory);
   }, [activeProducts, selectedCategory]);
 
   const form = useForm<NewOrderValues>({
     mode: "uncontrolled",
     initialValues: {
-      source: "grab",
+      source: "manual",
       externalOrderNumber: "",
       customerName: "",
       orderDate: toLocalDateTimeInput(new Date()),
@@ -113,13 +149,23 @@ export default function NewOrderPage() {
   });
 
   const handleQuickAdd = (product: MenuProduct) => {
+    if (!product.active || !product.available) {
+      notify.warning(
+        `Menu "${product.name}" sedang habis dan tidak dapat dipesan.`,
+        "Menu Habis",
+      );
+      return;
+    }
     sound.tap();
     const idx = form.values.items.findIndex((i) => i.menuId === product.id);
     if (idx >= 0) {
       const next = [...form.values.items];
       next[idx] = { ...next[idx], quantity: next[idx].quantity + 1 };
       form.setFieldValue("items", next);
-      notify.info(`Jumlah "${product.name}" ditambah menjadi ${next[idx].quantity}.`, "Item Ditambahkan");
+      notify.info(
+        `Jumlah "${product.name}" ditambah menjadi ${next[idx].quantity}.`,
+        "Item Ditambahkan",
+      );
     } else {
       form.insertListItem("items", {
         menuId: product.id,
@@ -127,7 +173,10 @@ export default function NewOrderPage() {
         addonIds: [],
         note: "",
       });
-      notify.success(`"${product.name}" dimasukkan ke daftar pesanan.`, "Menu Dipilih");
+      notify.success(
+        `"${product.name}" dimasukkan ke daftar pesanan.`,
+        "Menu Dipilih",
+      );
     }
   };
 
@@ -138,87 +187,95 @@ export default function NewOrderPage() {
     form.setFieldValue(`items.${index}.quantity`, nextQty);
   };
 
-  const toggleAddon = (index: number, addonId: string) => {
-    const item = form.values.items[index];
-    if (!item) return;
-    const has = item.addonIds.includes(addonId);
-    const next = {
-      ...item,
-      addonIds: has
-        ? item.addonIds.filter((a) => a !== addonId)
-        : [...item.addonIds, addonId],
-    };
-    form.setFieldValue(`items.${index}`, next);
-  };
-
   const totals = useMemo(() => {
     const mapped = form.values.items.map((item) => {
       const product = findProduct(products, item.menuId);
-      const addonsFor = item.addonIds
-        .map((id) => addons.find((a) => a.id === id))
-        .filter((a): a is NonNullable<typeof a> => Boolean(a));
       return {
         quantity: item.quantity,
         unitPrice: product?.price ?? 0,
-        addons: addonsFor.map((a) => ({ price: a.price, quantity: 1 })),
+        addons: [],
       };
     });
     return computeOrderTotals(mapped);
-  }, [form.values.items, products, addons]);
+  }, [form.values.items, products]);
 
-  const handleSubmit = () => {
+  const handleCancel = () => {
+    form.reset();
+    clientRequestIdRef.current = generateUUID();
+    closeNewOrder();
+  };
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+
     if (form.values.items.length === 0) {
       form.setFieldError("items", "Tambahkan minimal 1 item");
-      notify.warning("Pilih setidaknya 1 item menu sebelum menyimpan pesanan.", "Keranjang Kosong");
+      notify.warning(
+        "Pilih setidaknya 1 item menu sebelum menyimpan pesanan.",
+        "Keranjang Kosong",
+      );
       return;
     }
 
-    const items = form.values.items
-      .map((item) => {
-        const product = findProduct(products, item.menuId);
-        if (!product) return null;
-        const itemAddons = item.addonIds
-          .map((id) => addons.find((a) => a.id === id))
-          .filter((a): a is NonNullable<typeof a> => Boolean(a))
-          .map((a) => ({
-            id: a.id,
-            name: a.name,
-            price: a.price,
-            quantity: 1,
-          }));
-        return {
-          menuId: product.id,
-          menuName: product.name,
-          variant: undefined,
-          quantity: item.quantity,
-          unitPrice: product.price,
-          addons: itemAddons,
-          note: item.note.trim() || undefined,
-        };
-      })
-      .filter((i): i is NonNullable<typeof i> => Boolean(i));
+    setIsSubmitting(true);
+    try {
+      const items = form.values.items
+        .map((item) => {
+          const product = findProduct(products, item.menuId);
+          if (!product) return null;
+          return {
+            menuId: product.id,
+            menuName: product.name,
+            variant: undefined,
+            quantity: item.quantity,
+            unitPrice: product.price,
+            addons: [],
+            note: item.note.trim() || undefined,
+          };
+        })
+        .filter((i): i is NonNullable<typeof i> => Boolean(i));
 
-    const order = addOrder({
-      storeId: store.id,
-      source: form.values.source,
-      externalOrderNumber: form.values.externalOrderNumber,
-      customerName: form.values.customerName,
-      orderDate: new Date(form.values.orderDate).toISOString(),
-      items,
-      notes: form.values.notes,
-      paymentStatus: form.values.paymentStatus,
-      createdBy: user?.id ?? "system",
-      orderNumber: "",
-    });
+      const res = await addOrder({
+        storeId: store.id,
+        clientRequestId: clientRequestIdRef.current,
+        source: form.values.source,
+        externalOrderNumber: form.values.externalOrderNumber,
+        customerName: form.values.customerName,
+        orderDate: new Date(form.values.orderDate).toISOString(),
+        items,
+        notes: form.values.notes,
+        paymentStatus: form.values.paymentStatus,
+        createdBy: user?.id ?? "system",
+        orderNumber: "",
+      });
 
-    sound.order();
+      if (res.error) {
+        notify.danger(res.error, "Gagal Menyimpan Pesanan");
+        // Catatan: clientRequestIdRef.current sengaja tidak diubah agar retry memakai kunci yang sama
+        return;
+      }
 
-    notify.success(
-      `Pesanan #${order.orderNumber} berhasil dicatat dan disimpan!`,
-      "Pesanan Berhasil Disimpan",
-    );
+      // Server mengonfirmasi sukses: ganti dengan UUID baru untuk draf berikutnya
+      clientRequestIdRef.current = generateUUID();
 
-    openOrderDetail(order.id);
+      sound.order();
+
+      notify.success(
+        `Pesanan #${res.order.orderNumber} berhasil dicatat dan disimpan!`,
+        "Pesanan Berhasil Disimpan",
+      );
+
+      openOrderDetail(res.order.id);
+    } catch (err) {
+      notify.danger(
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat menyimpan pesanan.",
+        "Gagal Menyimpan Pesanan",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const hasErrors = Object.keys(form.errors).length > 0;
@@ -228,7 +285,7 @@ export default function NewOrderPage() {
       <div className="sticky top-[3rem] z-30 bg-gray-50 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <button
           type="button"
-          onClick={closeNewOrder}
+          onClick={handleCancel}
           className="flex items-center gap-1 cursor-pointer bg-transparent border-0 text-gray-600 dark:text-gray-300"
         >
           <ArrowLeftIcon size={18} />
@@ -280,7 +337,7 @@ export default function NewOrderPage() {
             })}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          <div className="grid grid-cols-1 gap-3 mt-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
                 No. Ref Eksternal (opsional)
@@ -309,7 +366,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          <div className="grid grid-cols-1 gap-3 mt-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
                 Waktu Pesanan
@@ -336,7 +393,9 @@ export default function NewOrderPage() {
                     <button
                       key={status}
                       type="button"
-                      onClick={() => form.setFieldValue("paymentStatus", status)}
+                      onClick={() =>
+                        form.setFieldValue("paymentStatus", status)
+                      }
                       className={`py-2.5 rounded-xl text-sm font-semibold border transition-all duration-150 cursor-pointer active:scale-95 ${
                         active
                           ? status === "dibayar"
@@ -356,6 +415,20 @@ export default function NewOrderPage() {
 
         {/* Quick add menu */}
         <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5">
+          {totalInProgressOrders > 0 && (
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-info-50 dark:bg-info-950/40 border border-info-200 dark:border-info-800/60 text-info-800 dark:text-info-300 text-xs mb-3">
+              <span className="w-2 h-2 rounded-full bg-info-500 animate-pulse mt-1 shrink-0" />
+              <div className="leading-snug">
+                <span className="font-semibold">Perhatian Antrean:</span> Ada{" "}
+                <span className="font-bold">
+                  {totalInProgressOrders} pesanan
+                </span>{" "}
+                sedang diproses di dapur. Menu yang diberi highlight biru
+                memiliki pesanan aktif yang harus segera diselesaikan!
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-2">
             <p className="font-semibold text-sm dark:text-gray-100">
               Pilih Item Menu
@@ -366,7 +439,7 @@ export default function NewOrderPage() {
           </div>
 
           <div className="flex gap-1.5 flex-nowrap overflow-x-auto pb-2 hide-scrollbar">
-            {MENU_CATEGORIES.map((cat) => (
+            {ORDER_MENU_CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 type="button"
@@ -382,8 +455,15 @@ export default function NewOrderPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-0.5">
+          <div className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto pr-0.5">
             {displayedProducts.map((product) => {
+              const isSoldOut = !product.available;
+              const inProgressInfo =
+                inProgressFoodMap[product.id] ||
+                inProgressFoodMap[product.name.toLowerCase().trim()];
+              const isProcessing = Boolean(
+                inProgressInfo && inProgressInfo.totalQty > 0,
+              );
               const currentQty =
                 form.values.items.find((i) => i.menuId === product.id)
                   ?.quantity ?? 0;
@@ -392,29 +472,91 @@ export default function NewOrderPage() {
                   key={product.id}
                   type="button"
                   onClick={() => handleQuickAdd(product)}
-                  className={`flex flex-col justify-between p-2.5 rounded-xl border transition-all duration-150 cursor-pointer text-left active:scale-95 ${
-                    currentQty > 0
-                      ? "border-primary-500 bg-primary-50/70 dark:bg-primary-950/40 shadow-xs border-l-4"
-                      : "border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-700/60 hover:border-primary-400 hover:shadow-xs"
+                  disabled={isSoldOut}
+                  className={`flex flex-col justify-between p-2.5 rounded-xl border transition-all duration-150 text-left ${
+                    isSoldOut
+                      ? "border-warning-300 dark:border-warning-700/60 bg-warning-50/70 dark:bg-warning-950/30 border-l-4 border-l-warning-500 cursor-not-allowed opacity-90"
+                      : isProcessing
+                        ? currentQty > 0
+                          ? "border-info-500 dark:border-info-400 bg-info-50/90 dark:bg-info-950/40 border-l-4 border-l-info-500 ring-2 ring-primary-500 shadow-xs cursor-pointer active:scale-95"
+                          : "border-info-300 dark:border-info-600 bg-info-50/70 dark:bg-info-950/30 border-l-4 border-l-info-500 hover:border-info-400 hover:shadow-xs cursor-pointer active:scale-95"
+                        : currentQty > 0
+                          ? "border-primary-500 bg-primary-50/70 dark:bg-primary-950/40 shadow-xs border-l-4 cursor-pointer active:scale-95"
+                          : "border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-700/60 hover:border-primary-400 hover:shadow-xs cursor-pointer active:scale-95"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-1 w-full">
-                    <span className="text-xs font-semibold dark:text-gray-100 line-clamp-2 leading-snug">
+                    <span
+                      className={`text-xs font-semibold line-clamp-2 leading-snug ${
+                        isSoldOut
+                          ? "text-gray-700 dark:text-gray-300"
+                          : isProcessing
+                            ? "text-info-900 dark:text-info-200 font-bold"
+                            : "dark:text-gray-100"
+                      }`}
+                    >
                       {product.name}
                     </span>
-                    {currentQty > 0 && (
-                      <span className="shrink-0 w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
-                        {currentQty}
+                    {isSoldOut ? (
+                      <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-warning-100 dark:bg-warning-900/60 text-warning-800 dark:text-warning-300 text-[10px] font-bold border border-warning-200 dark:border-warning-800">
+                        Habis
                       </span>
+                    ) : (
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isProcessing && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-info-100 dark:bg-info-900/60 text-info-700 dark:text-info-300 text-[10px] font-bold border border-info-200 dark:border-info-800">
+                            <span className="w-1.5 h-1.5 rounded-full bg-info-500 animate-pulse" />
+                            {inProgressInfo.totalQty} diproses
+                          </span>
+                        )}
+                        {currentQty > 0 && (
+                          <span className="w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
+                            {currentQty}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
+
+                  {isProcessing && !isSoldOut && (
+                    <div className="mt-1">
+                      <span className="text-[10px] font-semibold text-info-700 dark:text-info-300">
+                        ⚡ Segera selesaikan pesanan
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between w-full mt-2 pt-1 border-t border-gray-200/50 dark:border-gray-600/50">
-                    <span className="text-xs font-bold text-primary-700 dark:text-primary-400">
+                    <span
+                      className={`text-xs font-bold ${
+                        isSoldOut
+                          ? "text-gray-400 dark:text-gray-500"
+                          : isProcessing
+                            ? "text-info-800 dark:text-info-300"
+                            : "text-primary-700 dark:text-primary-400"
+                      }`}
+                    >
                       {formatCurrency(product.price)}
                     </span>
-                    <div className="w-5 h-5 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center">
-                      <PlusIcon size={13} color="#059669" className="shrink-0" />
-                    </div>
+                    {isSoldOut ? (
+                      <span className="text-[10px] font-bold text-warning-700 dark:text-warning-400">
+                        Habis
+                      </span>
+                    ) : (
+                      <div
+                        className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                          isProcessing
+                            ? "bg-info-100 dark:bg-info-900/50"
+                            : "bg-primary-100 dark:bg-primary-900/50"
+                        }`}
+                      >
+                        <PlusIcon
+                          size={13}
+                          color={isProcessing ? "#2563eb" : "#059669"}
+                          className="shrink-0"
+                        />
+                      </div>
+                    )}
                   </div>
                 </button>
               );
@@ -433,25 +575,33 @@ export default function NewOrderPage() {
             {form.values.items.map((item, index) => {
               const product = findProduct(products, item.menuId);
               if (!product) return null;
-              const productAddons = addons.filter((a) =>
-                product.addonIds.includes(a.id),
-              );
-              const itemAddonsTotal = item.addonIds
-                .map((id) => addons.find((a) => a.id === id))
-                .filter((a): a is NonNullable<typeof a> => Boolean(a))
-                .reduce((s, a) => s + a.price, 0);
-              const subtotal = item.quantity * product.price + itemAddonsTotal;
+              const subtotal = item.quantity * product.price;
+              const itemInProgress =
+                inProgressFoodMap[item.menuId] ||
+                inProgressFoodMap[product.name.toLowerCase().trim()];
 
               return (
                 <div
                   key={item.menuId}
-                  className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5"
+                  className={`rounded-xl border bg-white dark:bg-gray-800 p-3.5 ${
+                    itemInProgress && itemInProgress.totalQty > 0
+                      ? "border-info-200 dark:border-info-800 border-l-4 border-l-info-500"
+                      : "border-gray-200 dark:border-gray-700"
+                  }`}
                 >
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="font-semibold text-sm dark:text-gray-100 truncate">
-                        {product.name}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-sm dark:text-gray-100 truncate">
+                          {product.name}
+                        </span>
+                        {itemInProgress && itemInProgress.totalQty > 0 && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-info-50 dark:bg-info-950/60 text-info-700 dark:text-info-300 text-[10px] font-semibold border border-info-200 dark:border-info-800 shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-info-500 animate-pulse" />
+                            {itemInProgress.totalQty} diproses (segera selesaikan)
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {formatCurrency(product.price)} / item
                       </span>
@@ -479,7 +629,10 @@ export default function NewOrderPage() {
                         onClick={() => {
                           const itemName = product.name;
                           form.removeListItem("items", index);
-                          notify.info(`"${itemName}" dihapus dari pesanan.`, "Item Dihapus");
+                          notify.info(
+                            `"${itemName}" dihapus dari pesanan.`,
+                            "Item Dihapus",
+                          );
                         }}
                         className="w-9 h-9 rounded-lg bg-danger-50 dark:bg-danger-900/20 hover:bg-danger-100 dark:hover:bg-danger-900/40 flex items-center justify-center cursor-pointer border-0 ml-1 active:scale-90 transition-all"
                       >
@@ -487,28 +640,6 @@ export default function NewOrderPage() {
                       </button>
                     </div>
                   </div>
-
-                  {productAddons.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {productAddons.map((addon) => {
-                        const checked = item.addonIds.includes(addon.id);
-                        return (
-                          <button
-                            key={addon.id}
-                            type="button"
-                            onClick={() => toggleAddon(index, addon.id)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 cursor-pointer active:scale-95 ${
-                              checked
-                                ? "bg-primary border-primary text-white shadow-xs shadow-primary/30"
-                                : "bg-white dark:bg-gray-750 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-primary-400"
-                            }`}
-                          >
-                            +{addon.name} ({formatCurrency(addon.price)})
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
 
                   <div className="flex items-center gap-2 mt-3">
                     <input
@@ -555,10 +686,15 @@ export default function NewOrderPage() {
           <button
             type="button"
             onClick={handleSubmit}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-bold text-base cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-md shadow-primary/25"
+            disabled={isSubmitting}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-bold text-base transition-all border-0 shadow-md shadow-primary/25 ${
+              isSubmitting
+                ? "opacity-60 cursor-not-allowed"
+                : "cursor-pointer hover:brightness-105 active:scale-98"
+            }`}
           >
             <ShoppingCartIcon size={18} />
-            Simpan Pesanan
+            {isSubmitting ? "Menyimpan..." : "Simpan Pesanan"}
           </button>
         </div>
       </div>

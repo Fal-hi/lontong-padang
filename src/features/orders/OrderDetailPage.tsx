@@ -48,6 +48,7 @@ const ACTION_META: Record<
   ORDER_CORRECTED: { icon: 'pencil', label: 'Pesanan dikoreksi', color: '#ea580c' },
   PAYMENT_UPDATED: { icon: 'card', label: 'Pembayaran diubah', color: '#7c3aed' },
   DAY_CLOSED: { icon: 'lock', label: 'Hari ditutup', color: '#374151' },
+  DAY_REOPENED: { icon: 'rotate', label: 'Hari dibuka kembali', color: '#0284c7' },
 };
 
 const ACTION_ICON: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
@@ -58,6 +59,7 @@ const ACTION_ICON: Record<string, React.ComponentType<{ size?: number; color?: s
   pencil: PencilIcon,
   card: CreditCardIcon,
   lock: LockIcon,
+  rotate: RotateCcwIcon,
 };
 
 interface CorrectionItem {
@@ -107,7 +109,8 @@ export default function OrderDetailPage() {
   const [correctionReason, setCorrectionReason] = useState('');
   const [correctionError, setCorrectionError] = useState('');
 
-  const isOwner = user?.role === 'owner';
+  const isOwner = user?.role === 'owner' || user?.role === 'super_admin';
+  const isStaff = user?.role === 'staff';
 
   const orderLogs = useMemo(
     () =>
@@ -158,9 +161,9 @@ export default function OrderDetailPage() {
   const isFinal = order.status === 'selesai' || order.status === 'dibatalkan';
   const itemCount = order.items.reduce((s, i) => s + i.quantity, 0);
 
-  const handleStatusChange = (status: OrderStatus) => {
+  const handleStatusChange = async (status: OrderStatus) => {
     setActionError('');
-    const res = changeStatus(order.id, status);
+    const res = await changeStatus(order.id, status);
     if (!res.ok) {
       setActionError(res.error ?? 'Gagal mengubah status pesanan');
       notify.error(res.error ?? 'Gagal mengubah status pesanan', 'Gagal');
@@ -181,9 +184,11 @@ export default function OrderDetailPage() {
       return;
     }
     setSubmitting(true);
-    const res = changeStatus(order.id, 'dibatalkan', reason);
+    setActionError('');
+    const res = await changeStatus(order.id, 'dibatalkan', reason);
     if (!res.ok) {
       setReasonError(res.error ?? 'Gagal membatalkan');
+      setActionError(res.error ?? 'Gagal membatalkan pesanan');
       notify.error(res.error ?? 'Gagal membatalkan pesanan', 'Pembatalan Gagal');
       setSubmitting(false);
       return;
@@ -334,16 +339,48 @@ export default function OrderDetailPage() {
           </div>
         )}
 
+        {/* Banner highlight jika pesanan sedang diproses dan belum selesai */}
+        {order.status === "diproses" && (
+          <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-info-50 dark:bg-info-950/60 border-2 border-info-400 dark:border-info-600 text-info-950 dark:text-info-100 shadow-sm">
+            <span className="w-3 h-3 rounded-full bg-info-500 animate-ping shrink-0" />
+            <div className="flex-1">
+              <p className="font-bold text-sm text-info-900 dark:text-info-200">
+                ⚡ Pesanan Sedang Diproses di Dapur!
+              </p>
+              <p className="text-xs text-info-700 dark:text-info-300 mt-0.5">
+                Makanan sedang disiapkan. Segera selesaikan dan tekan tombol <strong>Tandai Selesai</strong> di bawah jika pesanan sudah siap disajikan.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Banner highlight jika pesanan sudah selesai tapi belum bayar */}
+        {order.status === "selesai" && order.paymentStatus === "belum_dibayar" && (
+          <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-warning-50 dark:bg-warning-950/60 border-2 border-warning-400 dark:border-warning-600 text-warning-950 dark:text-warning-100 shadow-sm">
+            <span className="w-3 h-3 rounded-full bg-warning-500 animate-ping shrink-0" />
+            <div className="flex-1">
+              <p className="font-bold text-sm text-warning-900 dark:text-warning-200">
+                ⚠️ Pesanan Selesai — Belum Dibayar!
+              </p>
+              <p className="text-xs text-warning-800 dark:text-warning-300 mt-0.5">
+                Makanan sudah disajikan. Tagihan sebesar <strong>{formatCurrency(order.total)}</strong> belum dibayar. Harap segera terima pembayaran dan tekan tombol <strong>Tandai Dibayar</strong> di bawah.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Header card */}
         <section
-          className={`rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5 shadow-xs ${
+          className={`rounded-xl border p-3.5 shadow-xs ${
             order.status === "selesai"
-              ? "border-l-4 border-l-primary-500"
+              ? order.paymentStatus === "belum_dibayar"
+                ? "border-warning-400 dark:border-warning-600 bg-warning-50/40 dark:bg-warning-950/20 border-l-4 border-l-warning-500 ring-2 ring-warning-400/30 shadow-md shadow-warning-500/10"
+                : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 border-l-4 border-l-primary-500"
               : order.status === "diproses"
-                ? "border-l-4 border-l-info-500"
+                ? "border-info-400 dark:border-info-600 bg-info-50/50 dark:bg-info-950/30 border-l-4 border-l-info-500 ring-2 ring-info-400/30 shadow-md shadow-info-500/10"
                 : order.status === "baru"
-                  ? "border-l-4 border-l-warning-500"
-                  : "border-l-4 border-l-danger-500"
+                  ? "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 border-l-4 border-l-warning-500"
+                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 border-l-4 border-l-danger-500"
           }`}
         >
           <div className="flex items-start justify-between gap-3">
@@ -397,17 +434,40 @@ export default function OrderDetailPage() {
         </section>
 
         {/* Items */}
-        <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5">
-          <p className="font-semibold text-sm mb-2 dark:text-gray-100">
-            Item ({itemCount})
-          </p>
+        <section
+          className={`rounded-xl border p-3.5 shadow-xs ${
+            order.status === "diproses"
+              ? "border-info-300 dark:border-info-700 bg-white dark:bg-gray-800 ring-1 ring-info-400/20"
+              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <p className="font-semibold text-sm dark:text-gray-100">
+              Item ({itemCount})
+            </p>
+            {order.status === "diproses" && (
+              <span className="text-xs font-semibold text-info-700 dark:text-info-300 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-info-500 animate-pulse" />
+                Harap segera diselesaikan
+              </span>
+            )}
+          </div>
           <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
             {order.items.map((item) => (
-              <div key={item.id} className="py-2.5 flex flex-col gap-1">
+              <div
+                key={item.id}
+                className={`py-2.5 flex flex-col gap-1 rounded-lg transition-colors ${
+                  order.status === "diproses"
+                    ? "px-2.5 bg-info-50/50 dark:bg-info-950/25 my-0.5 border border-info-200/60 dark:border-info-800/40"
+                    : ""
+                }`}
+              >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium dark:text-gray-100">
-                    {item.quantity}× {item.menuName}
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold dark:text-gray-100">
+                      {item.quantity}× {item.menuName}
+                    </span>
+                  </div>
                   <span className="text-sm font-semibold dark:text-gray-100">
                     {formatCurrency(item.quantity * item.unitPrice)}
                   </span>
@@ -462,10 +522,23 @@ export default function OrderDetailPage() {
             )}
             <button
               onClick={() => handleStatusChange("selesai")}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-semibold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-sm shadow-primary/25"
+              className={`w-full py-3 rounded-xl bg-gradient-to-r from-primary to-teal-600 text-white font-semibold text-sm cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-sm shadow-primary/25 ${
+                order.status === "diproses"
+                  ? "ring-2 ring-primary-500 ring-offset-2 shadow-md shadow-primary/40 font-bold"
+                  : ""
+              }`}
             >
               Tandai Selesai
             </button>
+            {order.paymentStatus === "belum_dibayar" && (
+              <button
+                onClick={handlePaymentToggle}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-secondary-50 dark:bg-secondary-950/40 text-secondary-700 dark:text-secondary-300 font-medium text-xs cursor-pointer hover:bg-secondary-100 dark:hover:bg-secondary-900/40 border border-secondary-200 dark:border-secondary-800/60 active:scale-98 transition-all"
+              >
+                <CreditCardIcon size={14} />
+                Terima Pembayaran di Muka (Tandai Dibayar)
+              </button>
+            )}
             <button
               onClick={() => setVoidOpen(true)}
               className="w-full py-3 rounded-xl bg-danger-50 dark:bg-danger-950/40 text-danger dark:text-danger-400 font-semibold text-sm cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900/40 border border-danger-200 dark:border-danger-800/60 active:scale-98 transition-all"
@@ -479,11 +552,25 @@ export default function OrderDetailPage() {
           <section className="flex flex-col gap-2">
             <button
               onClick={handlePaymentToggle}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-secondary-50 dark:bg-secondary-950/40 text-secondary-700 dark:text-secondary-300 font-semibold text-sm cursor-pointer hover:bg-secondary-100 dark:hover:bg-secondary-900/40 border border-secondary-200 dark:border-secondary-800/60 active:scale-98 transition-all"
+              className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm cursor-pointer transition-all border active:scale-98 ${
+                order.status === "selesai" && order.paymentStatus === "belum_dibayar"
+                  ? "bg-gradient-to-r from-warning-500 via-amber-500 to-warning-600 hover:from-warning-600 hover:to-amber-700 text-white border-warning-600 shadow-md shadow-warning-500/30 ring-2 ring-warning-400 ring-offset-2 animate-pulse"
+                  : "bg-secondary-50 dark:bg-secondary-950/40 text-secondary-700 dark:text-secondary-300 font-semibold border border-secondary-200 dark:border-secondary-800/60 hover:bg-secondary-100 dark:hover:bg-secondary-900/40"
+              }`}
             >
-              <CreditCardIcon size={16} />
-              Tandai{" "}
-              {order.paymentStatus === "dibayar" ? "Belum Dibayar" : "Dibayar"}
+              <CreditCardIcon
+                size={18}
+                className={
+                  order.status === "selesai" && order.paymentStatus === "belum_dibayar"
+                    ? "animate-bounce"
+                    : ""
+                }
+              />
+              {order.paymentStatus === "dibayar"
+                ? "Tandai Belum Dibayar"
+                : order.status === "selesai"
+                  ? "Tandai Sudah Dibayar (Wajib Bayar)"
+                  : "Tandai Dibayar"}
             </button>
             {isOwner && (
               <button
@@ -494,6 +581,34 @@ export default function OrderDetailPage() {
                 Koreksi Pesanan
               </button>
             )}
+
+            {/* Tombol Batalkan Pesanan untuk Pesanan Selesai */}
+            {order.status === "selesai" && (
+              isStaff ? (
+                <div className="flex flex-col gap-1 mt-1">
+                  <button
+                    type="button"
+                    disabled
+                    title="Hanya super admin yang dapat membatalkan pesanan selesai"
+                    className="w-full py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 font-semibold text-sm cursor-not-allowed border border-gray-200 dark:border-gray-700 transition-all opacity-60"
+                  >
+                    Batalkan Pesanan
+                  </button>
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400 text-center">
+                    Hanya super admin yang dapat membatalkan pesanan selesai
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setVoidOpen(true)}
+                  className="w-full py-3 rounded-xl bg-danger-50 dark:bg-danger-950/40 text-danger dark:text-danger-400 font-semibold text-sm cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900/40 border border-danger-200 dark:border-danger-800/60 active:scale-98 transition-all mt-1"
+                >
+                  Batalkan Pesanan
+                </button>
+              )
+            )}
+
             {order.status === "dibatalkan" && (
               <p className="text-xs text-center text-danger dark:text-danger-400">
                 Pesanan ini dibatalkan dan bersifat final.
@@ -588,6 +703,11 @@ export default function OrderDetailPage() {
             Batalkan <b>{order.orderNumber}</b>? Pembatalan tercatat permanen di
             riwayat audit dan tidak dapat dihapus.
           </p>
+          {order.status === 'selesai' && isStaff && (
+            <div className="p-2.5 rounded-lg bg-warning-50 dark:bg-warning-950/40 border border-warning-200 dark:border-warning-800 text-xs text-warning-800 dark:text-warning-300 font-medium">
+              Hanya super admin yang dapat membatalkan pesanan selesai
+            </div>
+          )}
           <Textarea
             placeholder="Alasan pembatalan (wajib)"
             value={reason}
@@ -596,6 +716,7 @@ export default function OrderDetailPage() {
               setReasonError('');
             }}
             minRows={3}
+            disabled={submitting || (order.status === 'selesai' && isStaff)}
           />
           {reasonError && (
             <span className="text-xs text-danger">{reasonError}</span>
@@ -608,9 +729,9 @@ export default function OrderDetailPage() {
               Batal
             </button>
             <button
-              disabled={submitting}
+              disabled={submitting || (order.status === 'selesai' && isStaff)}
               onClick={handleVoid}
-              className="flex-1 py-2.5 rounded-lg bg-danger text-white text-sm font-semibold cursor-pointer hover:opacity-90 transition-opacity border-0 disabled:opacity-60"
+              className="flex-1 py-2.5 rounded-lg bg-danger text-white text-sm font-semibold cursor-pointer hover:opacity-90 transition-opacity border-0 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Konfirmasi Pembatalan
             </button>
